@@ -37,7 +37,7 @@ class FeatureGenerator(object):
             for alignment in allAlign:
                 if only_gold:
                     gold_index = allAlign.index(alignment)
-                    classStr = self.get_classStr(ev_id, "%s_%s" % (cf_pair, gold_index), alignment)
+                    classStr = "%s_%s_%s" % (ev_id, cf_pair, gold_index) 
                 else:
                     classStr = self.get_classStr(ev_id, cf_pair, alignment)
 
