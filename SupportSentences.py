@@ -37,6 +37,7 @@ class SupportSentences(object):
 
             raw_sids = []
             for key in support_sentence_keys:
+                #print key
                 condition_string = self.get_condition(key.split('-'))
                 c.execute("select sids from pairs where %s" % condition_string)
                 all_rows = c.fetchall()
@@ -54,8 +55,7 @@ class SupportSentences(object):
             pred, args = key.split('|')[-1], key.split('|')[:-1]
 
             conditions.append('pa%s=\"%s\"' % (index + 1, pred))
-            for i in range(len(args) / 2):
-                arg, case_k = args[i], args[i+1]
+            for arg, case_k in zip(args[0::2], args[1::2]):
                 case = KATA_VER[case_k.decode('utf-8')]
                 cond = 'pa%s_%s=\"%s\"' % (index + 1, case, arg)
                 conditions.append(cond)
@@ -85,8 +85,9 @@ class SupportSentences(object):
             sub_dir_str = "/".join(sub_dirs)
 
         elif os.path.basename(self.config.sid2sent_dir) == "v2006-2015.text-cdb": 
-            if sid_components[1] == "":
-                sub_dirs = [sid_components[0], sid_components[2]] + list(sid_components[3][:3]) + [sid_components[3][:4]]
+            if 'data' in sid:
+                sid_components = [x for x in sid_components if x != ""]
+                sub_dirs = [sid_components[0], sid_components[1]] + list(sid_components[2][:3]) + [sid_components[2][:4]]
                 sub_dir_str = "/".join(sub_dirs)
             else:
                 sub_dirs = [sid_components[0]] + list(sid_components[1][:3]) + [sid_components[1][:4]]

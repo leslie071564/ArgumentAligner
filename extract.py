@@ -2,7 +2,9 @@
 import sys
 import yaml
 import argparse
+import shelve
 from argparse import Namespace
+import utils
 from EventChain import EventChain
 
 def setArgs(parser):
@@ -50,7 +52,7 @@ def setEventChainConfig(config_file):
 
 def init_event_chain(options):
     evs_config = setEventChainConfig(options.config_file)
-    evs = EventChain(evs_config, options.input_str)
+    evs = EventChain(evs_config, options.input_str, debug=False)
     evs.export()
 
 def merge_tmp_db(config_file):
@@ -76,7 +78,7 @@ if __name__ == "__main__":
     options = parser.parse_args()
 
     if options._subcommand == "print_task":
-        print_task(options.config_file)
+        print_task(options)
 
     elif options._subcommand == "init_event_chain":
         init_event_chain(options)

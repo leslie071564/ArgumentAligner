@@ -14,8 +14,10 @@ class Event(object):
     pred_pattern = r"[12]([vjn])([APCKML])(.+)$"
     arg_pattern = r"([12])([gwnod])(\d*)(.+)$"
 
-    def __init__(self, pred, args, pred_key, config):
+    def __init__(self, pred, args, pred_key, config, debug=False):
         self.config = config
+        self.debug = debug
+
         self._set_predicate(pred)
         self._set_givenArgs(args, pred_key)
 
@@ -25,6 +27,10 @@ class Event(object):
 
         self.predRep = utils.getPredRep(self.predStem, self.predVoice)
         self.predAmb = utils.getAmbiguousPredicate(self.predRep)
+        ###
+        if self.predVoice == 'P':
+            self.predAmb = self.predRep.replace("+れる/れる", "+られる/られる")
+        ###
         self.predType = u"判".encode('utf-8') if self.predVoice == 'L' else u"動".encode('utf-8')
 
     def _set_givenArgs(self, args, pred_key):
@@ -33,13 +39,17 @@ class Event(object):
         for arg_str in args:
             place, case, class_num, noun_str = regex.search(arg_str).groups()
             if class_num == "":
-                self.given_args[case] = noun_str.split(",")
+                self.givenArgs[case] = noun_str.split(",")
             else:
                 class_id = "%s%s%s" % (place, case, class_num)
                 self.givenArgs[case] = self._replace_word(pred_key, class_id, noun_str)
 
+        self.givenArgsRep = utils.getArgsRep(self.givenArgs)
+        if self.debug:
+            print "\tevent: %s %s" % (self.givenArgsRep, self.predRep)
+
     def _replace_word(self, pred_key, class_id, noun_str=""):
-        word_replace_cdbs = utils.seaech_file_with_prefix(self.config.word_replace_db) 
+        word_replace_cdbs = utils.search_file_with_prefix(self.config.word_replace_db)
 
         all_args = utils.search_cdbs(word_replace_cdbs, pred_key)
         all_args = sum(map(lambda x: x.split('|'), all_args), [])
@@ -69,7 +79,7 @@ class Event(object):
 
         return predKeys 
 
-    def _get_argKeys(self):
+    def _get_argKeys(self, upper_limit=3):
         argKeys = []
         for case in set(CASE_ENG) & set(self.givenArgs.keys()):
             case_kata = ENG_KATA[case].encode('utf-8')
@@ -77,6 +87,8 @@ class Event(object):
             argKeys.append(case_key)
 
         argKeys = ["".join(x) for x in itertools.product(*argKeys)]
+        if len(argKeys) > upper_limit:
+            argKeys = argKeys[:upper_limit]
         return argKeys
 
     def set_supArgs(self, supArgs):
@@ -85,27 +97,36 @@ class Event(object):
     def set_cfs(self, max_cf_num=10):
         self.cfs, self.cf_rels, self.cf_strs = [], {}, {}
         self._get_all_cfs()
+        if len(self.cfs) == 0:
+            return
 
-        self.cf_rels = sorted(self.cf_rels.items(), key=operator.itemgetter(1), reverse=True)[:10]
+        self.cf_rels = sorted(self.cf_rels.items(), key=operator.itemgetter(1), reverse=True)
         max_score = self.cf_rels[0][-1]
         if max_score == 0.0:
             self.cfs = self.cfs[:10]
         else:
             self.cfs = []
-            for cf_id, cf_rel in self.cf_rels:
+            for cf_id, cf_rel in self.cf_rels[:10]:
                 if cf_rel < max_score * 0.1:
                     break
                 self.cfs.append(cf_id)
 
         self.cf_rels = dict(self.cf_rels)
+        self.cfs = [x for x in self.cfs if x in self.cf_rels.keys()]
         self.cf_rels = {cf_id: self.cf_rels[cf_id] for cf_id in self.cfs}
         self.cf_strs = {cf_id: self.cf_strs[cf_id] for cf_id in self.cfs}
 
         assert len(self.cfs) == len(self.cf_rels)
         assert len(self.cfs) == len(self.cf_strs)
 
+        if self.debug:
+            print "num of cf: %s" % len(self.cfs)
+            print "\n".join(["\t[%s]: %s (%.3f)" % (cf_id, self.cf_strs[cf_id], self.cf_rels[cf_id]) for cf_id in self.cfs])
+
     def _get_all_cfs(self):
-        self.cfs = self._get_cf_ids(self.predRep) + self._get_cf_ids(self.predAmb)
+        self.cfs = self._get_cf_ids(self.predRep)
+        if self.predAmb and self.cfs == []:
+            self.cfs += self._get_cf_ids(self.predAmb)
 
         for cf_id in self.cfs:
             cf = CaseFrame(self.config, cf_id=cf_id)
@@ -132,7 +153,24 @@ class Event(object):
         cf_ids = ["%s%s" % (cf_prefix, index) for index in xrange(1, cf_count + 1)]
         return cf_ids
 
+    def get_eventRep(self):
+        return "%s %s" % (self.get_argsRep, self.predRep)
+
     def get_argsRep(self):
-        arg_reps = ["[%s]%s" % ("/".join(arg_list), ENG_HIRA[case].encode('utf-8')) for case, arg_list in self.givenArgs.items()]
+        arg_reps = ["[%s]%s" % (",".join(arg_list), ENG_HIRA[case].encode('utf-8')) for case, arg_list in self.givenArgs.items()]
         return " ".join(arg_reps)
+
+    def export(self):
+        export_dict = {}
+        export_dict['eventRep'] = self.get_eventRep()
+
+        export_dict['predRep'] = self.predRep
+        export_dict['givenArgs'] = self.givenArgs
+        export_dict['supArgs'] = self.supArgs
+
+        export_dict['cfs'] = self.cfs
+        export_dict['cf_scores'] = self.cf_rels
+        export_dict['cf_reps'] = self.cf_strs
+
+        return export_dict
 

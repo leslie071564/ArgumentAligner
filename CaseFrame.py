@@ -45,7 +45,16 @@ class CaseFrame(object):
 
             case = KATA_ENG[case]
             self.caseFrequencies[case] = int(freq)
-            self.args[case] = { arg.text.encode('utf-8'): int(arg.attrib['frequency']) for arg in case_xml }
+            self.args[case] = { arg.text.encode('utf-8'): int(arg.attrib['frequency']) for arg in case_xml if 'sm' not in arg.attrib.keys() }
+            if self.args[case] == {}:
+                self.caseFrequencies.pop(case, None)
+                self.args.pop(case, None)
+            """
+            try:
+                self.args[case] = { arg.text.encode('utf-8'): int(arg.attrib['frequency']) for arg in case_xml if 'sm' not in arg.attrib.keys() }
+            except:
+                print [ arg.text.encode('utf-8') for arg in case_xml if 'sm' not in arg.attrib.keys()]
+            """
 
     def _get_xml(self):
         CF = CDB_Reader(self.config.cf_cdb)
@@ -93,9 +102,9 @@ class CaseFrame(object):
         return cf_str
 
     def getRelevanceScore(self, supArgs, contextWords={}, supportWeight=1.0, contextWeight=0.5):
-        rel_score = 0
+        rel_score = 0.0
         for case in self.args.keys():
-            case_rel_score = 0
+            case_rel_score = 0.0
             if case in supArgs.keys():
                 supRel = utils.cosineSimilarity(supArgs[case], self.args[case], strip=False) 
                 case_rel_score += supRel * supportWeight
@@ -104,6 +113,12 @@ class CaseFrame(object):
                 contextRel = utils.cosineSimilarity(contextWords, self.args[case], strip=True)
                 case_rel_score += contextRel * contextWeight
             rel_score += case_rel_score
-
         return rel_score 
 
+    def get_core_cases(self, ratio=0.15):
+        if self.caseFrequencies == {}:
+            return []
+
+        coreThreshold = max(self.caseFrequencies.values()) * ratio
+        core_cases = [case for case, freq in self.caseFrequencies.iteritems() if freq > coreThreshold]
+        return core_cases

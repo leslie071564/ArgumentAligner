@@ -3,17 +3,20 @@ import sys
 import os
 import glob
 import cdb
+import itertools
 from math import sqrt
 from pyknp import Juman
 juman = Juman(command="/home/huang/usr/bin/juman", rcfile="/home/huang/usr/etc/jumanrc")
 
 CASE_ENG = ['g', 'w', 'n', 'd']
+CASE_VERBOSE = ['ga', 'wo', 'ni', 'de']
 CASE_KATA = [u"ガ", u"ヲ", u"ニ", u"デ"]
 CASE_HIRA = [u"が", u"を", u"に", u"で"]
 
 ENG_HIRA = dict(zip(CASE_ENG, CASE_HIRA))
 ENG_KATA = dict(zip(CASE_ENG, CASE_KATA))
 KATA_ENG = dict(zip(CASE_KATA, CASE_ENG))
+KATA_VER = dict(zip(CASE_KATA, CASE_VERBOSE))
 
 VOICE = ['A','P','C','K','M','L']
 VOICE_SUFFIX = [[""],[u"[受動]",u"[受動│可能]"], [u"[使役]"], [u"[可能]"], [u"[もらう]"], [u"[判]"]]
@@ -22,6 +25,15 @@ VOICE2SUFFIX = dict(zip(VOICE, VOICE_SUFFIX))
 NEG = ['v', 'j', 'n']
 NEG_SUFFIX = ["", u"[準否定]", u"[否定]"]
 NEG2SUFFIX = dict(zip(NEG, NEG_SUFFIX))
+
+ALL_ALIGN = []
+for i in [1,2,3,4]:
+    for p1 in itertools.combinations(CASE_ENG, i):
+        for p2 in itertools.permutations(CASE_ENG, i):
+             align = ["%s-%s" % (p1[x], p2[x]) for x in range(i)]
+             if align not in ALL_ALIGN:
+                 ALL_ALIGN.append(align)
+ALL_ALIGN.append([])
 
 def getPredRep(vStr, voice):
     postfix = {'P': "+れる/れる", 'C': "+せる/せる", 'sahen': "+する/する"}
@@ -38,6 +50,10 @@ def isSahen(vStr):
         return True
     return False
 
+def getArgsRep(args):
+    arg_reps = ["(%s) %s" % (",".join(arg_list), ENG_HIRA[case].encode('utf-8')) for case, arg_list in args.items()]
+    return " ".join(arg_reps)
+
 def getAmbiguousPredicate(predRep):
     postfix = ""
     if predRep.split('+') > 1:
@@ -50,7 +66,7 @@ def getAmbiguousPredicate(predRep):
     return ambPred if ambPred != predRep else None
 
 ### file operation
-def seaech_file_with_prefix(prefix, extension=None):
+def search_file_with_prefix(prefix, extension=None):
     in_dir = os.path.dirname(prefix)
     if extension:
         search_prefixes = ["%s*.%s" % (prefix, extension)]
@@ -104,4 +120,57 @@ def vector_norm(v):
             continue
         n2 += value ** 2
     return sqrt(n2)
+
+#
+def getExpandedAlign(aligns):
+    alignDict = getAlignCorrespondence(aligns)
+    expandedAlign = [x for x in set(sum(alignDict.values(), [])) if x != ""]
+    return expandedAlign
+    
+def getAllPossibleAlign(aligns):
+    alignDict = getAlignCorrespondence(aligns)
+    allPossible = list(itertools.product(*alignDict.values()))
+
+    allPossible = [[x for x in conf if x != ""] for conf in allPossible]
+    return allPossible
+
+def getAlignCorrespondence(aligns):
+    """
+    For the alignment configuration provided, return a dictionary of each alignment with its correspondent set of alignments.
+        ex: g/w-w =>[g-w, w-w]
+    """
+    if aligns == ['null'] or aligns == ['X']:
+        return {}
+    alignCorresponceDict = {}
+    checkZero = ['(', ')', 'p', 'g2']
+    for align in aligns:
+        nullAlignFlag, acceptSet = False, []
+        originalAlign = align
+
+        # parenthisis/p/g2
+        if any(x in align for x in checkZero):
+            nullAlignFlag = True
+            align = align.translate(None, '()2')
+
+        # Multi.
+        c1s, c2s = map(lambda x: x.split('/'), align.split('-'))
+        acceptSet += ["%s-%s" % (c1, c2) for c1, c2 in itertools.product(c1s, c2s) if 'p' not in [c1, c2]]
+
+        # Quasi.
+        if all("\'" in case for case in c1s) or all("\'" in case for case in c2s):
+            nullAlignFlag = True
+        acceptSet = map(lambda x: x.replace("\'", ""), acceptSet)
+
+        # d-d.
+        if 'd-d' in acceptSet:
+            nullAlignFlag = True
+        acceptSet = list(set(acceptSet))
+
+        # null alignment.
+        if nullAlignFlag:
+            acceptSet.append("")
+
+        alignCorresponceDict[originalAlign] = acceptSet
+
+    return alignCorresponceDict
 
