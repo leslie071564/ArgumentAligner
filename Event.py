@@ -154,10 +154,11 @@ class Event(object):
         return cf_ids
 
     def get_eventRep(self):
-        return "%s %s" % (self.get_argsRep, self.predRep)
+        evRep = "%s %s" % (self.get_argsRep(), self.predRep)
+        return evRep.lstrip()
 
     def get_argsRep(self):
-        arg_reps = ["[%s]%s" % (",".join(arg_list), ENG_HIRA[case].encode('utf-8')) for case, arg_list in self.givenArgs.items()]
+        arg_reps = ["%s %s" % (arg_list[0], ENG_HIRA[case].encode('utf-8')) for case, arg_list in self.givenArgs.items()]
         return " ".join(arg_reps)
 
     def export(self):
