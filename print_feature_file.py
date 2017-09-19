@@ -27,7 +27,7 @@ def setPrintFeatureConfig(config_file):
     config = yaml.load(open(config_file, 'r'))
     feature_config = Namespace()
 
-    feature_config.feat_db = config['Output']['FEAT']
+    feature_config.feat_db = config['DB']['FEAT']
 
     feature_config.normalFeats, feature_config.rivalFeats, feature_config.combFeats = [], [], []
     for feat in config['Feature extraction']['Load']:

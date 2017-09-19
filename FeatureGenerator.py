@@ -80,8 +80,11 @@ class FeatureGenerator(object):
 
     def _get_eventchain_data(self, ev_id):
         data_dict = shelve.open(self.feat_db, flag='r')[ev_id]
-        goldRaw = " ".join(data_dict['goldRaw'])
-        goldSets = data_dict['goldSets']
+        if data_dict['goldRaw'] == None:
+            goldRaw, goldSets = "", None
+        else:
+            goldRaw = " ".join(data_dict['goldRaw'])
+            goldSets = data_dict['goldSets']
         feat_dict = data_dict['features']
 
         return goldRaw, goldSets, feat_dict
