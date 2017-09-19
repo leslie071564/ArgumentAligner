@@ -26,7 +26,7 @@ rm -f $choose_task_file
 python $train_script initialize --ids_file $ids --key_file $key_file
 
 # train recursively.
-iter_max=15
+iter_max=$(( `cat $config_file | shyaml get-value Training.IterMax` ))
 for i in $(seq 1 $iter_max)
 do
     echo "##### iteration $i #####"
