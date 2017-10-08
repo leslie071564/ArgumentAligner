@@ -4,9 +4,12 @@ import sys
 import cdb
 import sqlite3
 from collections import Counter, defaultdict
+from pyknp import KNP
 sys.path.insert(1, "/home/huang/work/CDB_handler")
 from CDB_Reader import CDB_Reader
+import utils
 from utils import CASE_ENG, CASE_KATA, KATA_ENG, KATA_VER
+from db_interface import KNP_extractor
 
 class SupportSentences(object):
     def __init__(self, config, support_sentence_keys):
@@ -37,7 +40,6 @@ class SupportSentences(object):
 
             raw_sids = []
             for key in support_sentence_keys:
-                #print key
                 condition_string = self.get_condition(key.split('-'))
                 c.execute("select sids from pairs where %s" % condition_string)
                 all_rows = c.fetchall()
@@ -149,6 +151,36 @@ class SupportSentences(object):
                     if arg1 != arg2:
                         conflict_dict["%sX%s" % (c1, c2)] += 1
         return dict(conflict_dict)
+
+    def get_context_words(self):
+        knp = KNP()
+        knp_extractor = KNP_extractor(self.config.knp_index_db, self.config.knp_parent_dir, self.config.knp_sub_index_length)
+        context_words = Counter()
+
+        for index, sid in enumerate(self.sids[:5]):
+            sup_knp = knp_extractor.get_knp(sid.split('%')[0])
+            if not sup_knp:
+                continue
+
+            result = knp.result(sup_knp.decode('utf-8'))
+            context_words.update(self._get_sentence_args(result))
+        
+        context_words = dict(context_words)
+        return context_words
+
+    def _get_sentence_args(self, result):
+        all_args = []
+
+        for tag_id, tag in enumerate(result.tag_list()):
+            if u"<用言:" in tag.fstring:    # remove predicates.
+                continue
+
+            prev_tag = result.tag_list()[tag_id - 1] if tag_id else None
+            arg = utils.getNounRep(tag, prev_tag)
+            if arg:
+                arg = arg.rstrip('va')  # remove trailing 'v'/'a' characters
+                all_args.append(arg.encode('utf-8'))
+        return all_args
 
     def export(self):
         return self.sids

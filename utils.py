@@ -174,3 +174,58 @@ def getAlignCorrespondence(aligns):
 
     return alignCorresponceDict
 
+###
+class SQLtable(object):
+    def __init__(self, c, cols, table_name):
+        self.c = c
+        self.cols = cols
+        self.table_name = table_name
+        self.set_columns()
+
+    def set_columns(self):
+        self.c.execute("CREATE TABLE %s (id TEXT PRIMARY KEY)" % (self.table_name))
+        for col in self.cols:
+            self.c.execute("ALTER TABLE %s ADD COLUMN \'%s\' TEXT" % (self.table_name, col))
+
+    def set_row(self, row_data):
+        self.c.execute("INSERT INTO %s VALUES (\'%s\')" % (self.table_name, "\',\'".join(row_data)))
+
+def getNounRep(thisTag, prevTag):
+    # 正規化代表表記? 
+    thisRep = thisTag.repname.split('+')
+    if not thisRep:
+        return None
+
+    flag = False
+    if len(thisRep) == 1 and len(thisRep[0].split('/')[0]) == 1:
+        flag = True
+
+    if prevTag: 
+        prevMrph = prevTag.mrph_list()[-1]
+    else:
+        prevMrph = None
+
+    for mrph in thisTag.mrph_list():
+        if mrph.repname not in thisRep:
+            prevMrph = mrph
+            continue
+        mrph_index = thisRep.index(mrph.repname)
+        if mrph.hinsi == u"特殊":
+            return None
+        thisRep[mrph_index] = replace_by_category(mrph)
+        if flag:
+            if u"<複合←>" in mrph.fstring or mrph.hinsi == u"接尾辞":
+                prevMrphRep = replace_by_category(prevMrph)
+                if not prevMrphRep:
+                    return None
+                thisRep.insert(0, prevMrphRep)
+                break
+    return "+".join(thisRep)
+
+def replace_by_category(mrph):
+    if not mrph:
+        return None
+    if mrph.bunrui in [u"数詞", u"人名", u"地名"]:
+        return "[%s]" % mrph.bunrui
+    return mrph.repname
+

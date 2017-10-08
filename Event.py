@@ -9,6 +9,8 @@ from CDB_Reader import CDB_Reader
 import utils
 from utils import CASE_ENG, ENG_HIRA, ENG_KATA, NEG2SUFFIX, VOICE2SUFFIX
 from CaseFrame import CaseFrame
+from collections import defaultdict
+from event_to_counts import event_to_count
 
 class Event(object):
     pred_pattern = r"[12]([vjn])([APCKML])(.+)$"
@@ -27,7 +29,7 @@ class Event(object):
 
         self.predRep = utils.getPredRep(self.predStem, self.predVoice)
         self.predAmb = utils.getAmbiguousPredicate(self.predRep)
-        ###
+        ### MODIFY
         if self.predVoice == 'P':
             self.predAmb = self.predRep.replace("+れる/れる", "+られる/られる")
         ###
@@ -152,6 +154,69 @@ class Event(object):
 
         cf_ids = ["%s%s" % (cf_prefix, index) for index in xrange(1, cf_count + 1)]
         return cf_ids
+    
+    def get_contextArgScore(self, context_word):
+        if not hasattr(self, 'contextArgDenom'):
+            self.get_contextArgDenom()
+
+        sup_dict = defaultdict(int)
+        for pred, denom in self.contextArgDenom.iteritems():
+            for this_case in CASE_ENG:
+                if this_case not in denom.keys():
+                    continue
+                denomCount = denom[this_case]
+
+                arg_dict = self.givenArgs.copy()
+                arg_dict.update({this_case: [context_word]})
+                numerCount = event_to_count(pred, arg_dict)
+
+                supScore = round(float(numerCount) / denomCount, 3)
+                if supScore != 0:
+                    sup_dict[this_case] = max(sup_dict[this_case], supScore)
+        return dict(sup_dict)
+
+    def get_contextArgDenom(self):
+        """
+        Get the counts of the Evnet Predicate taking arguments in each case, cosidering givenArgs.
+            ex: [切手を貼る] => count(X-が/に/で 切手を 貼る)
+        """
+        contextArgDenom = {}
+        predicates = [self.predRep]
+        if self.predAmb:
+            predicates.append(self.predAmb)
+
+        for pred in predicates:
+            pred_dict = {}
+
+            for this_case in set(CASE_ENG) - set(self.givenArgs.keys()):
+                arg_dict = self.givenArgs.copy()
+                arg_dict.update({this_case: ['X']})
+                count = event_to_count(pred, arg_dict)
+                if count != 0:
+                    pred_dict[this_case] = count
+
+            if pred_dict != {}:
+                contextArgDenom[pred] = pred_dict
+        self.contextArgDenom = contextArgDenom
+
+    def get_contextCaseScore(self, context_word):
+        predicates = [self.predRep]
+        if self.predAmb:
+            predicates.append(self.predAmb)
+
+        contextCaseScores = {}
+        for pred in predicates:
+            for this_case in set(CASE_ENG) - set(self.givenArgs.keys()):
+                arg_dict = self.givenArgs.copy()
+                arg_dict.update({this_case: [context_word]})
+                count = event_to_count(pred, arg_dict)
+                if count:
+                    contextCaseScores[this_case] = count
+        if contextCaseScores != {}:
+            sup_sum = sum(contextCaseScores.values())
+            contextCaseScores = {case : round(float(score)/sup_sum, 3) for case, score in contextCaseScores.iteritems()}
+
+        return contextCaseScores
 
     def get_eventRep(self):
         evRep = "%s %s" % (self.get_argsRep(), self.predRep)

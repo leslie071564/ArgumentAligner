@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import sys
 import re
-import itertools
 import shelve
+import itertools
 from subprocess import check_output
 from collections import defaultdict
 from Event import Event
@@ -19,8 +19,10 @@ class EventChain(object):
 
         self._init_events(arg_str)
         self._init_gold()
+        # may move to somewhere else
         self.set_support_sentences()
         self.set_event_cfs()
+        # may move to somewhere else
 
     def _init_events(self, arg_str):
         regex = re.compile(EventChain.input_pattern)
@@ -35,10 +37,10 @@ class EventChain(object):
     def add_events(self, ev_strs):
         raw_preds, raw_args = [], []
         for ev_str in ev_strs:
-            ev_elements = ev_str.split(':')
+            raw_pred, raw_arg = ev_str.split(':')[0], ev_str.split(':')[1:]
 
-            raw_preds.append(ev_elements.pop(0))
-            raw_args.append(ev_elements)
+            raw_preds.append(raw_pred)
+            raw_args.append(raw_arg)
 
         pred_key = "-".join(raw_preds)
         for raw_pred, raw_arg in zip(raw_preds, raw_args): 
@@ -59,17 +61,19 @@ class EventChain(object):
         self.goldSets = utils.getAllPossibleAlign(gold_align) 
         
         if self.debug:
-            print "gold:", self.goldRaw
-            print "gold sets:", self.goldSets
+            print "gold:", self.goldRaw, "gold sets:", self.goldSets
 
     def set_support_sentences(self): 
         support_sentences_keys = self._get_support_sentences_keys()
         self.supSents = SupportSentences(self.config, support_sentences_keys) 
+
         self._set_event_supArgs()
+        self._set_contextScores()
 
         if self.debug:
             print "Support sentence extraction keys:\n\t%s" % ("\n\t".join(support_sentences_keys))
             print "Number of support sentences extracted: %d" % len(self.supSents.sids)
+            print "context words:", ' '.join(self.context_words)
         
     def _get_support_sentences_keys(self):
         event_keys = [ev.get_eventKeys() for ev in self.events]
@@ -81,6 +85,48 @@ class EventChain(object):
         for ev, supArg in itertools.izip(self.events, supArgs):
             ev.set_supArgs(supArg)
     
+    def _set_contextScores(self):
+        self.context_words = self.supSents.get_context_words()
+
+        self.set_contextArgScores()
+        self.set_contextCaseScores()
+        
+    def set_contextArgScores(self, threshold=0):
+        contextArgScores = {}
+
+        for context_word, count in self.context_words.iteritems():
+            if count <= threshold:
+                continue
+
+            score_dicts = []
+            for ev in self.events:
+                score_dict = ev.get_contextArgScore(context_word)
+                if not score_dict:
+                    break
+                score_dicts.append(score_dict)
+            else:
+                contextArgScores[context_word] = score_dicts
+
+        self.contextArgScores = contextArgScores
+
+    def set_contextCaseScores(self, threshold=0):
+        contextCaseScores = {}
+        for context_word, count in self.context_words.iteritems():
+            if count <= threshold:
+                continue
+
+            score_dicts = []
+            for ev in self.events:
+                score_dict = ev.get_contextCaseScore(context_word)
+                if not score_dict:
+                    break
+                print context_word, score_dict
+                score_dicts.append(score_dict)
+            else:
+                contextCaseScores[context_word] = score_dicts
+        print contextCaseScores
+        self.contextCaseScores = contextCaseScores
+            
     def set_event_cfs(self):
         for ev in self.events:
             ev.set_cfs()
