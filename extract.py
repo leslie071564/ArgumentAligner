@@ -4,6 +4,8 @@ import yaml
 import argparse
 import shelve
 from argparse import Namespace
+from collections import defaultdict
+from math import log
 import utils
 from EventChain import EventChain
 
@@ -30,7 +32,7 @@ def print_task(options):
     count = 0
     for line in open(arg_file).readlines():
         input_str = line.rstrip()
-        task = 'python extract.py init_event_chain \"%s\" --config_file %s && echo %s done.' % (input_str, config_file, count)
+        task = 'nice -n 19 python extract.py init_event_chain \"%s\" --config_file %s && echo %s done.' % (input_str, config_file, count)
         task_file.write(task + '\n')
         count += 1
 
@@ -45,7 +47,13 @@ def setEventChainConfig(config_file):
     evs_config.key2sid = config['Raw']['KEY_SID']
     evs_config.sid2pa = config['Raw']['SID_PA']
     evs_config.sid2sent_dir = config['Raw']['SID_SENT_DIR']
-    evs_config.cf_cdb = config['Raw']['CF_CDB']
+
+    evs_config.cf_cdb = config['DB']['CF_CDB']
+    evs_config.count_db = config['DB']['COUNT_DB']
+    evs_config.knp_index_db = config['DB']['KNP_INDEX_DB']
+    evs_config.knp_parent_dir = config['DB']['KNP_PARENT_DIR']
+    evs_config.knp_sub_index_length = int(config['DB']['KNP_SUB_LENGTH'])
+
     evs_config.output_db = config['Output']['TMP_DB_PREFIX']
 
     return evs_config
@@ -61,6 +69,7 @@ def merge_tmp_db(config_file):
     ev_db = shelve.open(config['EVENT_PAIR'])
     feat_db = shelve.open(config['FEAT'])
 
+    doc_freq = defaultdict(int)
     for f in utils.search_file_with_prefix(config['TMP_DB_PREFIX']):
         ID = f.split('_')[-1]
         tmp_db = shelve.open(f, flag='r')
@@ -68,6 +77,34 @@ def merge_tmp_db(config_file):
         ev_db[ID] = tmp_db['ev']
         feat_db[ID] = tmp_db['feat']
         sys.stderr.write("id: %s written.\n" % ID)
+
+    ev_db.close()
+    feat_db.close()
+
+    set_tf_idf(config['EVENT_PAIR'], config['FEAT'])
+
+def set_tf_idf(ev_db, feat_db):
+    ev_db = shelve.open(ev_db, flag='r')
+    feat_db = shelve.open(feat_db)
+
+    nums = ev_db.keys()
+    N = len(nums)
+
+    doc_freq = defaultdict(int)
+    for ID in nums:
+        ev_dict = ev_db[ID]
+        for word, count in ev_dict['context_words'].iteritems():
+            doc_freq[word] += 1
+
+    for ID in nums:
+        feat_dict = feat_db[ID]
+        ev_dict = ev_db[ID]
+
+        tf_idf_dict = {}
+        for word in feat_dict['features']['general']['cArg'].keys():
+            tf_idf_dict[word] = ev_dict['context_words'][word] * log(float(N) / doc_freq[word])
+        feat_dict['features']['general'].update({'context': tf_idf_dict})
+        feat_db[ID] = feat_dict
 
     ev_db.close()
     feat_db.close()

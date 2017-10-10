@@ -106,6 +106,7 @@ class EventChain(object):
                 score_dicts.append(score_dict)
             else:
                 contextArgScores[context_word] = score_dicts
+                #print context_word, score_dicts[0], score_dicts[1]
 
         self.contextArgScores = contextArgScores
 
@@ -120,11 +121,10 @@ class EventChain(object):
                 score_dict = ev.get_contextCaseScore(context_word)
                 if not score_dict:
                     break
-                print context_word, score_dict
                 score_dicts.append(score_dict)
             else:
                 contextCaseScores[context_word] = score_dicts
-        print contextCaseScores
+                #print context_word, score_dicts[0], score_dicts[1]
         self.contextCaseScores = contextCaseScores
             
     def set_event_cfs(self):
@@ -158,10 +158,9 @@ class EventChain(object):
         general_dict['conflict'] = self.supSents.get_conflict_dict()
         general_dict['sup'] = self.getSupFeats()
 
-        """
-        general_dict['cArg'], general_contributors['cArg'] = self.get_context_features("contextArgScores", get_contributors=True)
-        general_dict['cCase'], general_contributors['cCase'] = self.get_context_features("contextCaseScores", get_contributors=True)
-        """
+        general_dict['cArg'] = self.contextArgScores
+        general_dict['cCase'] = self.contextCaseScores
+
         return general_dict, general_contributors
 
     def getSupFeats(self):
@@ -173,6 +172,12 @@ class EventChain(object):
             if sim:
                 sup_feature_dict[align] = sim
         return sup_feature_dict
+
+    def getContextArgFeats(self):
+        pass
+
+    def getContextCaseFeats(self):
+        pass
 
     def getCfFeats(self, cf1, cf2, get_contributors=False):
         cf_dict, cf_contributors = {}, {}
@@ -213,6 +218,7 @@ class EventChain(object):
             return
         ev_dict, feat_dict = {}, {}
         ev_dict['supSents'] = self.supSents.sids
+        ev_dict['context_words'] = self.context_words
         ev_dict['events'] = []
         for ev in self.events:
             if len(ev.cfs) == 0:
