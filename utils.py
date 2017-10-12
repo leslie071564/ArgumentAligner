@@ -18,14 +18,6 @@ ENG_KATA = dict(zip(CASE_ENG, CASE_KATA))
 KATA_ENG = dict(zip(CASE_KATA, CASE_ENG))
 KATA_VER = dict(zip(CASE_KATA, CASE_VERBOSE))
 
-VOICE = ['A','P','C','K','M','L']
-VOICE_SUFFIX = [[""],[u"[受動]",u"[受動│可能]"], [u"[使役]"], [u"[可能]"], [u"[もらう]"], [u"[判]"]]
-VOICE2SUFFIX = dict(zip(VOICE, VOICE_SUFFIX))
-
-NEG = ['v', 'j', 'n']
-NEG_SUFFIX = ["", u"[準否定]", u"[否定]"]
-NEG2SUFFIX = dict(zip(NEG, NEG_SUFFIX))
-
 ALL_ALIGN = []
 for i in [1,2,3,4]:
     for p1 in itertools.combinations(CASE_ENG, i):

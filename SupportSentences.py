@@ -3,7 +3,8 @@ import os
 import sys
 import cdb
 import sqlite3
-from collections import Counter, defaultdict
+import operator
+from collections import Counter, defaultdict, namedtuple
 from pyknp import KNP
 sys.path.insert(1, "/home/huang/work/CDB_handler")
 from CDB_Reader import CDB_Reader
@@ -11,47 +12,46 @@ import utils
 from utils import CASE_ENG, CASE_KATA, KATA_ENG, KATA_VER
 from db_interface import KNP_extractor
 
+### where?
+supSent = namedtuple('supSent', ['sid', 'rel', 'raw_sentence', 'pa_struc'])
+
 class SupportSentences(object):
     def __init__(self, config, support_sentence_keys):
         self.config = config
         self.config.sid2pa = CDB_Reader(self.config.sid2pa)
 
-        self._set_sids(support_sentence_keys)
+        self._set_sents(support_sentence_keys)
 
-    def _set_sids(self, support_sentence_keys):
-        self.sids, self.rels, self.sents, self.pas = [], [], [], []
+    def _set_sents(self, support_sentence_keys):
+        self.sents = []
 
-        raw_sids = self._get_raw_sids(support_sentence_keys)
-        for raw_sid in raw_sids:
-            self._parse_raw_sids(raw_sid)
+        for sid in self._get_sids(support_sentence_keys):
+            sent_tuple = self._get_sentence_tuple(sid)
+            if sent_tuple != None:
+                self.sents.append(sent_tuple)
 
-        assert len(self.sids) == len(self.rels)
-        assert len(self.sids) == len(self.sents)
-        assert len(self.sids) == len(self.pas)
-
-    def _get_raw_sids(self, support_sentence_keys):
+    def _get_sids(self, support_sentence_keys):
         if self.config.key2sid.endswith("cdb.keymap"):
             key2sid_cdb = CDB_Reader(self.config.key2sid)
-            raw_sids = [key2sid_cdb.get(key) for key in support_sentence_keys]
+            sids = [key2sid_cdb.get(key) for key in support_sentence_keys]
 
         elif self.config.key2sid.endswith(".sqlite"):
             conn = sqlite3.connect(self.config.key2sid)
             c = conn.cursor()
 
-            raw_sids = []
+            sids = []
             for key in support_sentence_keys:
-                condition_string = self.get_condition(key.split('-'))
-                c.execute("select sids from pairs where %s" % condition_string)
+                query_condition = self._get_sqlQueryCondition(key.split('-'))
+                c.execute("select sids from pairs where %s" % query_condition)
                 all_rows = c.fetchall()
-                for row in all_rows:
-                    raw_sids.append(row[0])
+                sids += [row[0] for row in all_rows]
 
             conn.close()
 
-        raw_sids = sum([x.split(',') for x in raw_sids if x is not None], [])
-        return raw_sids
+        sids = sum([x.split(',') for x in sids if x is not None], [])
+        return sids
 
-    def get_condition(self, keys):
+    def _get_sqlQueryCondition(self, keys):
         conditions = []
         for index, key in enumerate(keys):
             pred, args = key.split('|')[-1], key.split('|')[:-1]
@@ -65,18 +65,15 @@ class SupportSentences(object):
         condition_string = ' and '.join(conditions)
         return condition_string
 
-    def _parse_raw_sids(self, raw_sid):
+    def _get_sentence_tuple(self, raw_sid):
         sid = raw_sid.split(":")[0]
         rel = raw_sid.split(":")[1].split(";")[0]
         sent = self._get_sentence_by_sid(sid)
         pa = self._get_pa_by_sid(sid)
         if sent == None or pa == None:
-            return
+            return None
 
-        self.sids.append(sid)
-        self.rels.append(rel)
-        self.sents.append(sent)
-        self.pas.append(pa)
+        return supSent(sid, rel, sent, pa)
 
     def _get_sentence_by_sid(self, sid):
         sid = sid.split('%')[0]
@@ -111,17 +108,6 @@ class SupportSentences(object):
         else:
             return self._parse_pa_str(paStr)
 
-    def get_supArgs(self):
-        supArgs = [defaultdict(list), defaultdict(list)]
-
-        for pas in [x for x in self.pas if x is not None]:
-            for index, pa in enumerate(pas):
-                for case, arg in pa.items():
-                    supArgs[index][case].append(arg)
-
-        supArgs = [{case: dict(Counter(args)) for case, args in x.items()} for x in supArgs]
-        return supArgs
-
     def _parse_pa_str(self, pa_str):
         pa_str = pa_str.split(" | ")[0]
         pa1, pa2 = map(lambda x: x.split(" "), pa_str.split(" - "))
@@ -137,28 +123,26 @@ class SupportSentences(object):
 
         return pa_dicts
 
-    def get_conflict_dict(self):
-        conflict_dict = defaultdict(int)
-        for PAs in self.pas:
-            PA1, PA2 = PAs
-            for c1 in filter(lambda x: x in CASE_ENG, PA1.keys()):
-                conflict_dict["%s1" % c1] += 1
-                for c2 in filter(lambda x: x in CASE_ENG, PA2.keys()):
-                    conflict_dict["%s2" % c2] += 1
+    def get_supArgs(self):
+        supArgs = [defaultdict(list), defaultdict(list)]
 
-                    conflict_dict["%s-%s" % (c1, c2)] += 1
-                    arg1, arg2 = PA1[c1], PA2[c2]
-                    if arg1 != arg2:
-                        conflict_dict["%sX%s" % (c1, c2)] += 1
-        return dict(conflict_dict)
+        for sent_tuple in self.sents:
+            pas = sent_tuple.pa_struc
+            for index, pa in enumerate(pas):
+                for case, arg in pa.items():
+                    supArgs[index][case].append(arg)
+
+        supArgs = [{case: dict(Counter(args)) for case, args in x.items()} for x in supArgs]
+        return supArgs
 
     def get_context_words(self):
         knp = KNP()
         knp_extractor = KNP_extractor(self.config.knp_index_db, self.config.knp_parent_dir, self.config.knp_sub_index_length)
         context_words = Counter()
 
-        for index, sid in enumerate(self.sids[:5]):
-            sup_knp = knp_extractor.get_knp(sid.split('%')[0])
+        for index, sent_tuple in enumerate(self.sents):
+            sid = sent_tuple.sid.split('%')[0]
+            sup_knp = knp_extractor.get_knp(sid)
             if not sup_knp:
                 continue
 
@@ -182,6 +166,21 @@ class SupportSentences(object):
                 all_args.append(arg.encode('utf-8'))
         return all_args
 
+    def getConflictScores(self):
+        conflict_dict = defaultdict(int)
+        for sent_tuple in self.sents:
+            PA1, PA2 = sent_tuple.pa_struc
+            for c1 in filter(lambda x: x in CASE_ENG, PA1.keys()):
+                conflict_dict["%s1" % c1] += 1
+                for c2 in filter(lambda x: x in CASE_ENG, PA2.keys()):
+                    conflict_dict["%s2" % c2] += 1
+
+                    conflict_dict["%s-%s" % (c1, c2)] += 1
+                    arg1, arg2 = PA1[c1], PA2[c2]
+                    if arg1 != arg2:
+                        conflict_dict["%sX%s" % (c1, c2)] += 1
+        return dict(conflict_dict)
+
     def export(self):
-        return self.sids
+        return list(map(operator.attrgetter('sid'), self.sents))
 

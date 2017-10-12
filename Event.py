@@ -4,17 +4,28 @@ import re
 import operator
 import itertools
 import xml.etree.ElementTree as ET
+from collections import defaultdict, namedtuple
+
 sys.path.insert(1, "/home/huang/work/CDB_handler")
 from CDB_Reader import CDB_Reader
 import utils
-from utils import CASE_ENG, ENG_HIRA, ENG_KATA, NEG2SUFFIX, VOICE2SUFFIX
+from utils import CASE_ENG, ENG_HIRA, ENG_KATA
 from CaseFrame import CaseFrame
-from collections import defaultdict
 from event_to_counts import event_to_count
+### where?
+CF = namedtuple('CF', ['cf_id', 'cf_str', 'rel_score'])
 
 class Event(object):
     pred_pattern = r"[12]([vjn])([APCKML])(.+)$"
     arg_pattern = r"([12])([gwnod])(\d*)(.+)$"
+
+    VOICE = ['A','P','C','K','M','L']
+    VOICE_SUFFIX = [[""],[u"[受動]",u"[受動│可能]"], [u"[使役]"], [u"[可能]"], [u"[もらう]"], [u"[判]"]]
+    VOICE2SUFFIX = dict(zip(VOICE, VOICE_SUFFIX))
+
+    NEG = ['v', 'j', 'n']
+    NEG_SUFFIX = ["", u"[準否定]", u"[否定]"]
+    NEG2SUFFIX = dict(zip(NEG, NEG_SUFFIX))
 
     def __init__(self, pred, args, pred_key, config, debug=False):
         self.config = config
@@ -26,17 +37,32 @@ class Event(object):
     def _set_predicate(self, pred_str):
         regex = re.compile(Event.pred_pattern)
         self.predNegation, self.predVoice, self.predStem = regex.search(pred_str).groups()
+        self.predType = u"判".encode('utf-8') if self.predVoice == 'L' else u"動".encode('utf-8')
 
+        self._set_predRep()
+        self._set_predAmb()
+
+        if self.debug:
+            print self.predRep, '->', " ".join(self.predAmb)
+
+    def _set_predRep(self):
         self.predRep = utils.getPredRep(self.predStem, self.predVoice)
-        self.predAmb = utils.getAmbiguousPredicate(self.predRep)
+
+    def _set_predAmb(self):
+        self.predAmb = []
+
+        predAmb = utils.getAmbiguousPredicate(self.predRep)
+        if predAmb:
+            self.predAmb.append(predAmb)
+
         ### MODIFY
         if self.predVoice == 'P':
-            self.predAmb = self.predRep.replace("+れる/れる", "+られる/られる")
-        ###
-        self.predType = u"判".encode('utf-8') if self.predVoice == 'L' else u"動".encode('utf-8')
+            predAmb = self.predRep.replace("+れる/れる", "+られる/られる")
+            self.predAmb.append(predAmb)
 
     def _set_givenArgs(self, args, pred_key):
         self.givenArgs = {}
+
         regex = re.compile(Event.arg_pattern)
         for arg_str in args:
             place, case, class_num, noun_str = regex.search(arg_str).groups()
@@ -45,10 +71,6 @@ class Event(object):
             else:
                 class_id = "%s%s%s" % (place, case, class_num)
                 self.givenArgs[case] = self._replace_word(pred_key, class_id, noun_str)
-
-        self.givenArgsRep = utils.getArgsRep(self.givenArgs)
-        if self.debug:
-            print "\tevent: %s %s" % (self.givenArgsRep, self.predRep)
 
     def _replace_word(self, pred_key, class_id, noun_str=""):
         word_replace_cdbs = utils.search_file_with_prefix(self.config.word_replace_db)
@@ -74,11 +96,10 @@ class Event(object):
 
     def _get_predKeys(self): 
         pred_stem = self.predStem if self.predVoice in ['P', 'C'] else self.predRep
-        neg_suffix = NEG2SUFFIX[self.predNegation]
-        voice_suffix = VOICE2SUFFIX[self.predVoice]
+        neg_suffix = Event.NEG2SUFFIX[self.predNegation]
+        voice_suffix = Event.VOICE2SUFFIX[self.predVoice]
 
         predKeys = map(lambda x: "%s%s%s" % (pred_stem, neg_suffix, x.encode('utf-8')), voice_suffix)
-
         return predKeys 
 
     def _get_argKeys(self, upper_limit=3):
@@ -89,6 +110,7 @@ class Event(object):
             argKeys.append(case_key)
 
         argKeys = ["".join(x) for x in itertools.product(*argKeys)]
+        ### MODIFY
         if len(argKeys) > upper_limit:
             argKeys = argKeys[:upper_limit]
         return argKeys
@@ -96,65 +118,53 @@ class Event(object):
     def set_supArgs(self, supArgs):
         self.supArgs = supArgs
 
-    def set_cfs(self, max_cf_num=10):
-        self.cfs, self.cf_rels, self.cf_strs = [], {}, {}
-        self._get_all_cfs()
-        if len(self.cfs) == 0:
+    def set_cfs(self, max_cf_num=10, trim_threshold=0.1):
+        candidate_cfs = self._get_all_cfs()
+        if candidate_cfs == []:
             return
 
-        self.cf_rels = sorted(self.cf_rels.items(), key=operator.itemgetter(1), reverse=True)
-        max_score = self.cf_rels[0][-1]
-        if max_score == 0.0:
-            self.cfs = self.cfs[:10]
-        else:
-            self.cfs = []
-            for cf_id, cf_rel in self.cf_rels[:10]:
-                if cf_rel < max_score * 0.1:
-                    break
-                self.cfs.append(cf_id)
-
-        self.cf_rels = dict(self.cf_rels)
-        self.cfs = [x for x in self.cfs if x in self.cf_rels.keys()]
-        self.cf_rels = {cf_id: self.cf_rels[cf_id] for cf_id in self.cfs}
-        self.cf_strs = {cf_id: self.cf_strs[cf_id] for cf_id in self.cfs}
-
-        assert len(self.cfs) == len(self.cf_rels)
-        assert len(self.cfs) == len(self.cf_strs)
+        self.cfs = sorted(candidate_cfs, key=operator.attrgetter('rel_score'), reverse=True)[:max_cf_num]
+        max_score = self.cfs[0].rel_score * trim_threshold
+        if max_score != 0.0:
+            self.cfs = [cf for cf in self.cfs if cf.rel_score >= max_score]
 
         if self.debug:
             print "num of cf: %s" % len(self.cfs)
-            print "\n".join(["\t[%s]: %s (%.3f)" % (cf_id, self.cf_strs[cf_id], self.cf_rels[cf_id]) for cf_id in self.cfs])
+            print "\n".join(["\t[%s]: %s (%.3f)" % (cf.cf_id, cf.cf_str, cf.rel_score) for cf in self.cfs])
 
     def _get_all_cfs(self):
-        self.cfs = self._get_cf_ids(self.predRep)
-        if self.predAmb and self.cfs == []:
-            self.cfs += self._get_cf_ids(self.predAmb)
+        cf_ids = self._get_cf_ids()
 
-        for cf_id in self.cfs:
+        candidate_cfs = []
+        for cf_id in cf_ids:
             cf = CaseFrame(self.config, cf_id=cf_id)
             cf_rel = cf.getRelevanceScore(self.supArgs)
             cf_str = cf.get_cf_str()
 
-            self.cf_rels[cf.id] = cf_rel
-            self.cf_strs[cf.id] = cf_str
+            cf_tuple = CF(cf_id, cf_str, cf_rel)
+            candidate_cfs.append(cf_tuple)
 
-    def _get_cf_ids(self, predSurface):
-        if not predSurface:
-            return []
+        return candidate_cfs
 
-        CF = CDB_Reader(self.config.cf_cdb)
-        predCounts = CF.get(predSurface)
-        if predCounts is None or self.predType not in predCounts:
-            sys.stderr.write("Cannot find predicate %s.\n" % predSurface)
-            return []
+    def _get_cf_ids(self):
+        cf_cdb = CDB_Reader(self.config.cf_cdb)
+        predicates = [self.predRep] + self.predAmb
+        
+        cf_ids = []
+        for pred in predicates:
+            predCounts = cf_cdb.get(pred)
+            if predCounts != None and self.predType in predCounts:
+                predCountDict = {x.split(':')[0]: x.split(':')[1] for x in predCounts.split('/')}
+                cf_count = int(predCountDict[self.predType])
+                cf_ids += ["%s:%s%s" % (pred, self.predType, index) for index in xrange(1, cf_count + 1)]
+            else:
+                sys.stderr.write('No case frame found for predicate %s:%s\n' % (pred, self.predType) )
 
-        predCounts = {x.split(':')[0]: x.split(':')[1] for x in predCounts.split('/')}
-        cf_prefix = "%s:%s" % (predSurface, self.predType)
-        cf_count = int(predCounts[self.predType])
+            if pred == self.predRep and cf_ids != []:
+                break
 
-        cf_ids = ["%s%s" % (cf_prefix, index) for index in xrange(1, cf_count + 1)]
         return cf_ids
-    
+
     def get_contextArgScore(self, context_word):
         if not hasattr(self, 'contextArgDenom'):
             self.get_contextArgDenom()
@@ -183,7 +193,7 @@ class Event(object):
         contextArgDenom = {}
         predicates = [self.predRep]
         if self.predAmb:
-            predicates.append(self.predAmb)
+            predicates += self.predAmb
 
         for pred in predicates:
             pred_dict = {}
@@ -202,7 +212,7 @@ class Event(object):
     def get_contextCaseScore(self, context_word):
         predicates = [self.predRep]
         if self.predAmb:
-            predicates.append(self.predAmb)
+            predicates += self.predAmb
 
         contextCaseScores = {}
         for pred in predicates:
@@ -229,14 +239,13 @@ class Event(object):
     def export(self):
         export_dict = {}
         export_dict['eventRep'] = self.get_eventRep()
-
         export_dict['predRep'] = self.predRep
+        export_dict['predAmb'] = self.predAmb
+
         export_dict['givenArgs'] = self.givenArgs
         export_dict['supArgs'] = self.supArgs
 
         export_dict['cfs'] = self.cfs
-        export_dict['cf_scores'] = self.cf_rels
-        export_dict['cf_reps'] = self.cf_strs
 
         return export_dict
 
