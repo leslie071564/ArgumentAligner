@@ -20,6 +20,7 @@ def setArgs(parser):
     init_parser = subparsers.add_parser("init_event_chain")
     init_parser.add_argument("input_str", action="store")
     init_parser.add_argument("--config_file", action="store", dest="config_file")
+    init_parser.add_argument("--debug", action="store_true", dest="debug")
 
     merge_parser = subparsers.add_parser("merge_tmp_db")
     merge_parser.add_argument("--config_file", action="store", dest="config_file")
@@ -42,17 +43,19 @@ def setEventChainConfig(config_file):
     config = yaml.load(open(config_file, 'r'))
 
     evs_config = Namespace()
-    evs_config.gold_file = config['Raw']['GOLD']
-    evs_config.word_replace_db = config['Raw']['WORD_REPLACE']
-    evs_config.key2sid = config['Raw']['KEY_SID']
-    evs_config.sid2pa = config['Raw']['SID_PA']
-    evs_config.sid2sent_dir = config['Raw']['SID_SENT_DIR']
+    config_raw = config['Raw']
+    evs_config.gold_file = config_raw['GOLD']
+    evs_config.word_replace_db = config_raw['WORD_REPLACE']
+    evs_config.key2sid = config_raw['KEY_SID']
+    evs_config.sid2pa = config_raw['SID_PA']
+    evs_config.sid2sent_dir = config_raw['SID_SENT_DIR']
 
-    evs_config.cf_cdb = config['DB']['CF_CDB']
-    evs_config.count_db = config['DB']['COUNT_DB']
-    evs_config.knp_index_db = config['DB']['KNP_INDEX_DB']
-    evs_config.knp_parent_dir = config['DB']['KNP_PARENT_DIR']
-    evs_config.knp_sub_index_length = int(config['DB']['KNP_SUB_LENGTH'])
+    db_locs = config['DB']
+    evs_config.cf_cdb = db_locs['CF_CDB']
+    evs_config.count_db = db_locs['COUNT_DB']
+    evs_config.knp_index_db = db_locs['KNP_INDEX_DB']
+    evs_config.knp_parent_dir = db_locs['KNP_PARENT_DIR']
+    evs_config.knp_sub_index_length = int(db_locs['KNP_SUB_LENGTH'])
 
     evs_config.output_db = config['Output']['TMP_DB_PREFIX']
 
@@ -60,7 +63,7 @@ def setEventChainConfig(config_file):
 
 def init_event_chain(options):
     evs_config = setEventChainConfig(options.config_file)
-    evs = EventChain(evs_config, options.input_str, debug=False)
+    evs = EventChain(evs_config, options.input_str, debug=options.debug)
     evs.export()
 
 def merge_tmp_db(config_file):

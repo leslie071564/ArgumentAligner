@@ -4,8 +4,8 @@ extract_script=./extract.py
 
 # generate task file from input arg_file 
 arg_file=`cat $config_file | shyaml get-value Raw.ARG_FILE`
+log_file=`cat $config_file | shyaml get-value Output.LOG`
 task_file=./extract.task
-log_file=./tmp
 python $extract_script print_task --arg_file $arg_file --config_file $config_file --task_file $task_file
 
 # extract eventChain data by gxpc.
