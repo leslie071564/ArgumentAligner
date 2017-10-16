@@ -7,6 +7,7 @@ from argparse import Namespace
 from collections import defaultdict
 from math import log
 import utils
+import itertools
 from EventChain import EventChain
 
 def setArgs(parser):
@@ -71,6 +72,7 @@ def merge_tmp_db(config_file):
 
     ev_db = shelve.open(config['EVENT_PAIR'])
     feat_db = shelve.open(config['FEAT'])
+    ids_file = open(config['IDS'], 'wb')
 
     doc_freq = defaultdict(int)
     for f in utils.search_file_with_prefix(config['TMP_DB_PREFIX']):
@@ -79,15 +81,17 @@ def merge_tmp_db(config_file):
         
         ev_db[ID] = tmp_db['ev']
         feat_db[ID] = tmp_db['feat']
+        ids_file.write('%s\n' % ID)
         sys.stderr.write("id: %s written.\n" % ID)
 
     ev_db.close()
     feat_db.close()
+    ids_file.close()
 
     set_tf_idf(config['EVENT_PAIR'], config['FEAT'])
 
 def set_tf_idf(ev_db, feat_db):
-    ev_db = shelve.open(ev_db, flag='r')
+    ev_db = shelve.open(ev_db)
     feat_db = shelve.open(feat_db)
 
     nums = ev_db.keys()
@@ -104,13 +108,37 @@ def set_tf_idf(ev_db, feat_db):
         ev_dict = ev_db[ID]
 
         tf_idf_dict = {}
-        for word in feat_dict['features']['general']['cArg'].keys():
+        for word in ev_dict['cArgScores'].keys():
             tf_idf_dict[word] = ev_dict['context_words'][word] * log(float(N) / doc_freq[word])
-        feat_dict['features']['general'].update({'context': tf_idf_dict})
+
+        ev_dict['tf_idf'] = tf_idf_dict
+        
+        feat_dict['features']['general']['cArg'], ev_dict['feature_contributors']['general']['cArg'] = _get_contextFeatDict(ev_dict['cArgScores'], tf_idf_dict)
+        feat_dict['features']['general']['cCase'], ev_dict['feature_contributors']['general']['cCase'] = _get_contextFeatDict(ev_dict['cCaseScores'], tf_idf_dict, normalize=True)
+
+        ev_db[ID] = ev_dict
         feat_db[ID] = feat_dict
 
     ev_db.close()
     feat_db.close()
+
+def _get_contextFeatDict(contextDicts, weightDict, normalize=False):
+    contextFeatDict = defaultdict(float)
+    contributorDict = defaultdict(str)
+
+    for context_word, weight in weightDict.iteritems():
+        s1, s2 = contextDicts[context_word]
+        for c1, c2 in itertools.product(s1.keys(), s2.keys()):
+            score = weight * s1[c1] * s2[c2]
+            contextFeatDict['%s-%s' % (c1, c2)] += score
+            contributorDict['%s-%s' % (c1, c2)] += "%s(%.3f)<br>" % (context_word, score)
+
+    if normalize:
+        sup_sum = sum(contextFeatDict.values())
+        if sup_sum:
+            contextFeatDict = {case : score/sup_sum for case, score in contextFeatDict.iteritems()}
+
+    return (dict(contextFeatDict), dict(contributorDict))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

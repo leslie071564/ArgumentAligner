@@ -115,8 +115,6 @@ class EventChain(object):
         general_dict['postPred'] = self.getPostPredCases()
         general_dict['conflict'] = self.supSents.getConflictScores()
         general_dict['sup'] = self.getSupFeats()
-        general_dict['cArg'] = self.getContextArgScores()
-        general_dict['cCase'] = self.getContextCaseScores()
 
         return general_dict, general_contributors
 
@@ -209,19 +207,26 @@ class EventChain(object):
             return
 
         if any(len(ev.cfs) == 0 for ev in self.events):
-            sys.stderr.write("discarding %s: no candidate cf for %s.\n" % (self.id, ev.predRep))
+            sys.stderr.write("discarding %s: no candidate cf.\n" % self.id)
             return
 
         ev_dict, feat_dict = {}, {}
-        ev_dict['supSents'] = self.supSents.export()
-        ev_dict['context_words'] = self.context_words
         ev_dict['events'] = [ev.export() for ev in self.events]
+        ev_dict['supSents'] = self.supSents.export()
 
         feat_dict['goldRaw'] = self.goldRaw
         feat_dict['goldSets'] = self.goldSets
+
+        ev_dict['context_words'] = self.context_words
+        ev_dict['cArgScores'] = self.getContextArgScores()
+        ev_dict['cCaseScores'] = self.getContextCaseScores()
+
         feat_dict['features'], ev_dict['feature_contributors'] = self.getAllFeats(get_contributors=True)
 
         if self.debug:
+            print ev_dict.keys()
+            print feat_dict.keys()
+            print ev_dict['feature_contributors']
             return
 
         # write to tmp-db
