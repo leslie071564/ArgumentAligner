@@ -2,6 +2,8 @@
 import sys
 import shelve
 import random
+import itertools
+from collections import defaultdict
 from utils import ALL_ALIGN
 
 class FeatureGenerator(object):
@@ -10,6 +12,8 @@ class FeatureGenerator(object):
                 'Conflict': ("get_conflict", 'conf'), \
                 'Cfsim': ("get_cfsim", 'cfsim'), \
                 'Core': ("get_core", 'core'), \
+                'ContextArg': ("get_contextArg", 'cArg'), \
+                'ContextCase': ("get_contextCase", 'cCase')
                 }
 
     def __init__(self, config):
@@ -135,6 +139,26 @@ class FeatureGenerator(object):
             confFeats.append("%s_%s:%.3f" % (a, postfix, score))
 
         return " ".join(confFeats)
+
+    def get_contextArg(self, align, cf_pair, postfix, feat_dict):
+        cArgFeats = []
+
+        cArgDict = feat_dict['general']['cArg']
+        for a in set(align) & set(cArgDict.keys()):
+            score = cArgDict[a]
+            cArgFeats.append("%s_%s:%.3f" % (a, postfix, score))
+
+        return " ".join(cArgFeats)
+
+    def get_contextCase(self, align, cf_pair, postfix, feat_dict):
+        cCaseFeats = []
+
+        cCaseDict = feat_dict['general']['cCase']
+        for a in set(align) & set(cCaseDict.keys()):
+            score = cCaseDict[a]
+            cCaseFeats.append("%s_%s:%.3f" % (a, postfix, score))
+
+        return " ".join(cCaseFeats)
 
     ### cf-related features.
     def get_cfsim(self, align, cf_pair, postfix, feat_dict):
