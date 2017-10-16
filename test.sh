@@ -21,3 +21,4 @@ rm -f $test_task_file
 
 # print result_file
 cat $test_dir/* | classias-tag -m $model -tk > $result_file
+echo result file: $result_file

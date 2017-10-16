@@ -11,8 +11,11 @@ mkdir -p $result_dir
 exp_config=$exp_dir/exp_config.yaml
 cp $config_file $exp_config
 
-# split ids for each cv-fold.
+IDS_raw=`cat $config_file | shyaml get-value DB.IDS`
 IDS=$exp_dir/ids.txt
+cp $IDS_raw $IDS
+
+# split ids for each cv-fold.
 shuf $IDS --output=$IDS
 total_instance_num=$(cat $IDS | wc -l)
 cv_fold_num=$(( `cat $config_file | shyaml get-value CV.FoldNum` ))
