@@ -121,6 +121,7 @@ class Event(object):
     def set_cfs(self, max_cf_num=10, trim_threshold=0.1):
         candidate_cfs = self._get_all_cfs()
         if candidate_cfs == []:
+            self.cfs = []
             return
 
         self.cfs = sorted(candidate_cfs, key=operator.attrgetter('rel_score'), reverse=True)[:max_cf_num]
