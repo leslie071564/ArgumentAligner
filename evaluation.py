@@ -6,11 +6,12 @@ import shelve
 import argparse
 import sqlite3
 import utils
-from utils import SQLtable
+from visulize_utils import getColoredAlign, SQLtable, EventPairTable, GeneralFeatureTable, cfFeatureTable
 
 class alignResultProcessor(object):
     dataFormat = ["charStr", "cf_num1", "cf_num2", "goldResult", "outputResult"]
     def __init__(self, config, result_file_prefix):
+        self.config = config
         self.ev_db = shelve.open(config['DB']['EVENT_PAIR'], flag='r')
         self.feat_db = shelve.open(config['DB']['FEAT'], flag='r')
         self.resultFiles = utils.search_file_with_prefix(result_file_prefix)
@@ -27,7 +28,7 @@ class alignResultProcessor(object):
                 ID, cf1, cf2 = line[:3]
                 output = line[3:]
 
-                exp_result = self.getResult(ID, output)
+                exp_result = self._getResult(ID, output)
                 goldResult, outputResult = exp_result['gold'], exp_result['output']
 
                 evp = self.ev_db[ID]
@@ -35,7 +36,7 @@ class alignResultProcessor(object):
 
                 self.resultData[ID] = dict(zip(self.dataFormat, [charStr, cf1, cf2, goldResult, outputResult])) 
 
-    def getResult(self, ID, output):
+    def _getResult(self, ID, output):
         if output == ['null']:
             output = []
 
@@ -64,18 +65,6 @@ class alignResultProcessor(object):
 
         return {'output': {'+': outputPos, '-': outputNeg}, 'gold': {'+': goldPos, '-': goldNeg, '*': goldNeu}}
 
-    def _get_gold_counts(self):
-        gold_pos = sum([len(x['goldResult']['+']) for x in self.resultData.values()])
-        gold_neg = sum([len(x['goldResult']['-']) for x in self.resultData.values()])
-        gold_counts = {'+': gold_pos, '-': gold_neg}
-        return gold_counts
-
-    def _get_output_counts(self):
-        output_pos = sum([len(x['outputResult']['+']) for x in self.resultData.values()])
-        output_neg = sum([len(x['outputResult']['-']) for x in self.resultData.values()])
-        output_counts = {'+': output_pos, '-': output_neg}
-        return output_counts
-
     def evaluate(self):
         outputResult = self._get_output_counts()
         outputAll = sum(outputResult.values())
@@ -93,6 +82,18 @@ class alignResultProcessor(object):
 
         return {'AER': AER, 'precision': precision, 'recall': recall}
 
+    def _get_gold_counts(self):
+        gold_pos = sum([len(x['goldResult']['+']) for x in self.resultData.values()])
+        gold_neg = sum([len(x['goldResult']['-']) for x in self.resultData.values()])
+        gold_counts = {'+': gold_pos, '-': gold_neg}
+        return gold_counts
+
+    def _get_output_counts(self):
+        output_pos = sum([len(x['outputResult']['+']) for x in self.resultData.values()])
+        output_neg = sum([len(x['outputResult']['-']) for x in self.resultData.values()])
+        output_counts = {'+': output_pos, '-': output_neg}
+        return output_counts
+
     def printOverviewTable(self, db_loc):
         conn = sqlite3.connect(db_loc)
         c = conn.cursor()
@@ -101,38 +102,68 @@ class alignResultProcessor(object):
         resultDB = SQLtable(c, cols, table_name)
 
         for ID, data_dict in self.resultData.iteritems():
+            ### MODIFY
+            if ID in ['658020']:
+                continue
+            ### MODIFY
             data = [] 
             data.append(data_dict['charStr'])
-            data.append(self.getColoredAlign(data_dict['goldResult'], highlight_color='green'))
-            data.append(self.getColoredAlign(data_dict['outputResult'], highlight_color='red'))
+            data.append(getColoredAlign(data_dict['goldResult'], highlight_color='green'))
+            data.append(getColoredAlign(data_dict['outputResult'], highlight_color='red'))
 
             resultDB.set_row([str(ID)] + data)
 
         conn.commit()
         conn.close()
 
-    def getColoredAlign(self, aligns_dict, highlight_color='red'):
-        aligns_dict['-'] = map(lambda x: x.replace("'", "’"), aligns_dict['-'])
-        aligns_dict['+'] = map(lambda x: x.replace("'", "’"), aligns_dict['+'])
-        colored_align = []
-        colored_align += aligns_dict['+']
-        colored_align += ["<font color=\"%s\">\"%s\"</font>" % (highlight_color, x) for x in aligns_dict['-']]
-        if '*' in aligns_dict.keys():
-            aligns_dict['*'] = map(lambda x: x.replace("'", "’"), aligns_dict['*'])
-            colored_align += ["<font color=\"gray\">\"%s\"</font>" % (x) for x in aligns_dict['*']]
+    def printDetailTables(self, db_loc):
+        conn = sqlite3.connect(db_loc)
+        c = conn.cursor()
 
-        colored_align = " ".join(colored_align)
-        return colored_align
+        self.printEventPairTable(c)
+        self.printGeneralFeatureTable(c)
+        self.printCfFeatureTable(c)
 
-                
+        conn.commit()
+        conn.close()
+
+    def printEventPairTable(self, cursor):
+        sys.stderr.write("loading eventpair table...\n")
+        evpTable = EventPairTable(cursor, self.config)
+        for ID in self.resultData.keys():
+            evpTable.set_row(ID)
+
+    def printGeneralFeatureTable(self, cursor):
+        sys.stderr.write("loading general feature table...\n")
+        genTable = GeneralFeatureTable(cursor, self.config)
+        for ID in self.resultData.keys():
+            genTable.set_row(ID)
+
+    def printCfFeatureTable(self, cursor):
+        sys.stderr.write("loading cf feature table...\n")
+        cfTable = cfFeatureTable(cursor, self.config)
+        for ID in self.resultData.keys():
+            cfTable.set_rows(ID)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', "--result_dir", action="store", dest="result_dir")
     parser.add_argument('--config_file', action="store", default="./config.yaml", dest="config_file")
+
+    parser.add_argument('--print_scores', action="store_true", dest="print_scores")
+    parser.add_argument('--build_overview_db', action="store", dest="build_overview_db")
+    parser.add_argument('--build_detail_db', action="store", dest="build_detail_db")
     options = parser.parse_args() 
 
     config = yaml.load(open(options.config_file, 'r'))
-
     evl = alignResultProcessor(config, options.result_dir)
-    evl_result = evl.evaluate()
+
+    if options.print_scores:
+        evl.evaluate()
+
+    if options.build_overview_db:
+        evl.printOverviewTable(options.build_overview_db)
+
+    if options.build_detail_db:
+        evl.printDetailTables(options.build_detail_db)
 

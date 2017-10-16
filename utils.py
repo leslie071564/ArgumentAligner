@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
+import re
 import os
 import glob
 import cdb
@@ -103,7 +104,7 @@ def cosineSimilarity(v1, v2, strip=False, skip_set = [u"<主体準>"], restrict_
             if get_contributors:
                 contribute_list.append("%s(%s,%s)" % (w, v1[w],v2[w]))
 
-    return inner/denom if not get_contributors else (inner/denom, contribute_list)
+    return inner/denom if not get_contributors else (inner/denom, "<br>".join(contribute_list) )
 
 def vector_norm(v):
     n2 = 0
@@ -167,21 +168,6 @@ def getAlignCorrespondence(aligns):
     return alignCorresponceDict
 
 ###
-class SQLtable(object):
-    def __init__(self, c, cols, table_name):
-        self.c = c
-        self.cols = cols
-        self.table_name = table_name
-        self.set_columns()
-
-    def set_columns(self):
-        self.c.execute("CREATE TABLE %s (id TEXT PRIMARY KEY)" % (self.table_name))
-        for col in self.cols:
-            self.c.execute("ALTER TABLE %s ADD COLUMN \'%s\' TEXT" % (self.table_name, col))
-
-    def set_row(self, row_data):
-        self.c.execute("INSERT INTO %s VALUES (\'%s\')" % (self.table_name, "\',\'".join(row_data)))
-
 def getNounRep(thisTag, prevTag):
     # 正規化代表表記? 
     thisRep = thisTag.repname.split('+')
@@ -221,3 +207,8 @@ def replace_by_category(mrph):
         return "[%s]" % mrph.bunrui
     return mrph.repname
 
+def removeHira(verboseStr, splitChar=['+']):
+    verboseStrs = re.split(r'[%s]+' % ("".join(splitChar)), verboseStr)
+    shortStrs = map(lambda x: x.split('/')[0], verboseStrs)
+
+    return "+".join(shortStrs)
