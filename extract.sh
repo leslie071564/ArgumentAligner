@@ -11,7 +11,7 @@ python $extract_script print_task --arg_file $arg_file --config_file $config_fil
 # extract eventChain data by gxpc.
 tmpDBDir=`cat $config_file | shyaml get-value Output.TMP_DB_DIR`
 mkdir -p $tmpDBDir
-gxpc js -a work_file=extract.task -a cpu_factor=0.25 2> $log_file
+gxpc js -a work_file=extract.task -a cpu_factor=0.125 2> $log_file
 
 # merge
 python $extract_script merge_tmp_db --config_file $config_file

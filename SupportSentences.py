@@ -135,12 +135,11 @@ class SupportSentences(object):
         supArgs = [{case: dict(Counter(args)) for case, args in x.items()} for x in supArgs]
         return supArgs
 
-    def get_context_words(self):
+    def get_context_words(self, sentence_size_limit=100):
         knp = KNP()
         knp_extractor = KNP_extractor(self.config.knp_index_db, self.config.knp_parent_dir, self.config.knp_sub_index_length)
         context_words = Counter()
-
-        for index, sent_tuple in enumerate(self.sents):
+        for index, sent_tuple in enumerate(self.sents[:sentence_size_limit]):
             sid = sent_tuple.sid.split('%')[0]
             sup_knp = knp_extractor.get_knp(sid)
             if not sup_knp:
