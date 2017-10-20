@@ -212,3 +212,29 @@ def removeHira(verboseStr, splitChar=['+']):
     shortStrs = map(lambda x: x.split('/')[0], verboseStrs)
 
     return "+".join(shortStrs)
+
+def get_sentence_by_sid(sid, sid2sent_dir):
+    sid = sid.split('%')[0]
+    sid_components = sid.split('-')
+
+    if os.path.basename(sid2sent_dir) == "tsubame.results.orig-cdb":
+        sub_dirs = [sid_components[0], sid_components[1][:4], sid_components[1][:6]]
+        sub_dir_str = "/".join(sub_dirs)
+
+    elif os.path.basename(sid2sent_dir) == "v2006-2015.text-cdb": 
+        if 'data' in sid:
+            sid_components = [x for x in sid_components if x != ""]
+            sub_dirs = [sid_components[0], sid_components[1]] + list(sid_components[2][:3]) + [sid_components[2][:4]]
+            sub_dir_str = "/".join(sub_dirs)
+        else:
+            sub_dirs = [sid_components[0]] + list(sid_components[1][:3]) + [sid_components[1][:4]]
+            sub_dir_str = "/".join(sub_dirs)
+
+    sid2sent = "%s/%s.cdb" % (sid2sent_dir, sub_dir_str)
+    SID2SENT = cdb.init(sid2sent.encode('utf-8'))
+
+    sent = SID2SENT.get(sid)
+    if sent == None:
+        sys.stderr.write("Cannot retrieve sentence of sid:%s.\n" % sid)
+    return sent
+

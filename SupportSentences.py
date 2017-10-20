@@ -76,29 +76,7 @@ class SupportSentences(object):
         return supSent(sid, rel, sent, pa)
 
     def _get_sentence_by_sid(self, sid):
-        sid = sid.split('%')[0]
-        sid_components = sid.split('-')
-
-        if os.path.basename(self.config.sid2sent_dir) == "tsubame.results.orig-cdb":
-            sub_dirs = [sid_components[0], sid_components[1][:4], sid_components[1][:6]]
-            sub_dir_str = "/".join(sub_dirs)
-
-        elif os.path.basename(self.config.sid2sent_dir) == "v2006-2015.text-cdb": 
-            if 'data' in sid:
-                sid_components = [x for x in sid_components if x != ""]
-                sub_dirs = [sid_components[0], sid_components[1]] + list(sid_components[2][:3]) + [sid_components[2][:4]]
-                sub_dir_str = "/".join(sub_dirs)
-            else:
-                sub_dirs = [sid_components[0]] + list(sid_components[1][:3]) + [sid_components[1][:4]]
-                sub_dir_str = "/".join(sub_dirs)
-
-        sid2sent = "%s/%s.cdb" % (self.config.sid2sent_dir, sub_dir_str)
-        SID2SENT = cdb.init(sid2sent.encode('utf-8'))
-
-        sent = SID2SENT.get(sid)
-        if sent == None:
-            sys.stderr.write("Cannot retrieve sentence of sid:%s.\n" % sid)
-        return sent
+        return utils.get_sentence_by_sid(sid, self.config.sid2sent_dir)
     
     def _get_pa_by_sid(self, sid):
         paStr = self.config.sid2pa.get("%s:" % sid)
