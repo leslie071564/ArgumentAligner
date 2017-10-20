@@ -136,9 +136,11 @@ def _get_contextFeatDict(contextDicts, weightDict, normalize=False):
     if normalize:
         sup_sum = sum(contextFeatDict.values())
         if sup_sum:
-            contextFeatDict = {case : score/sup_sum for case, score in contextFeatDict.iteritems()}
+            contextFeatDict = {case : round(score/sup_sum, 3) for case, score in contextFeatDict.iteritems()}
+    else:
+        contextFeatDict = {case : round(score, 3) for case, score in contextFeatDict.iteritems()}
 
-    return (dict(contextFeatDict), dict(contributorDict))
+    return (contextFeatDict, dict(contributorDict))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
