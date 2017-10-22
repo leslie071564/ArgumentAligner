@@ -97,7 +97,7 @@ class alignResultProcessor(object):
     def printOverviewTable(self, db_loc):
         conn = sqlite3.connect(db_loc)
         c = conn.cursor()
-        cols = ["charStr", "goldResult", "outputResult"]
+        cols = ["charStr", "goldResult", "outputResult", "cf_num1", "cf_num2"]
         table_name = "overview"
         resultDB = SQLtable(c, cols, table_name)
 
@@ -110,6 +110,7 @@ class alignResultProcessor(object):
             data.append(data_dict['charStr'])
             data.append(getColoredAlign(data_dict['goldResult'], highlight_color='green'))
             data.append(getColoredAlign(data_dict['outputResult'], highlight_color='red'))
+            data += [data_dict['cf_num1'], data_dict['cf_num2']]
 
             resultDB.set_row([str(ID)] + data)
 
