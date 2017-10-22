@@ -231,6 +231,8 @@ class Event(object):
 
     def get_eventRep(self):
         evRep = "%s %s" % (self.get_argsRep(), self.predRep)
+        if self.predNegation == 'n':
+            evRep += u"+ない/ない".encode('utf-8')
         return evRep.lstrip()
 
     def get_argsRep(self):
