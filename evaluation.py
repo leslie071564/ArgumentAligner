@@ -102,10 +102,6 @@ class alignResultProcessor(object):
         resultDB = SQLtable(c, cols, table_name)
 
         for ID, data_dict in self.resultData.iteritems():
-            ### MODIFY
-            if ID in ['658020']:
-                continue
-            ### MODIFY
             data = [] 
             data.append(data_dict['charStr'])
             data.append(getColoredAlign(data_dict['goldResult'], highlight_color='green'))
