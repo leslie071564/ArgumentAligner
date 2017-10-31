@@ -3,7 +3,7 @@ NICE="nice -n 19"
 exp_dir="$1"
 config_file="$2"
 
-# mkdir. 
+# mkdir.
 mkdir -p $exp_dir
 result_dir=$exp_dir/result
 mkdir -p $result_dir
@@ -44,5 +44,4 @@ do
 done
 
 # evaluation
-# temporary
-python ./evaluation.py --result_dir $result_dir/result_ --config $exp_config
+python ./evaluation.py --result_dir $result_dir/result_ --config_file $exp_config --print_scores
