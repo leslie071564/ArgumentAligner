@@ -2,8 +2,9 @@
 NICE="nice -n 19"
 exp_dir="$1"
 config_file="$2"
+model="$3"
 
-model=`cat $config_file | shyaml get-value MODEL`
+#model=`cat $config_file | shyaml get-value MODEL`
 
 # set paths
 ids=$exp_dir/ids.txt
