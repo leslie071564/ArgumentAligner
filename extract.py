@@ -13,6 +13,13 @@ from EventChain import EventChain
 def setArgs(parser):
     subparsers = parser.add_subparsers(dest="_subcommand")
 
+    config_parser = subparsers.add_parser("print_config")
+    config_parser.add_argument("--template", action="store", dest="template")
+    config_parser.add_argument("--arg_file", action="store", dest="arg_file")
+    config_parser.add_argument("--output_dir", action="store", dest="output_dir")
+    config_parser.add_argument("--tmp_subdir", action="store", default="tmp", dest="tmp_subdir")
+    config_parser.add_argument("--tmp_prefix", action="store", default="single.db", dest="tmp_prefix")
+
     task_parser = subparsers.add_parser("print_task")
     task_parser.add_argument("--arg_file", action="store", dest="arg_file")
     task_parser.add_argument("--config_file", action="store", dest="config_file")
@@ -25,6 +32,9 @@ def setArgs(parser):
 
     merge_parser = subparsers.add_parser("merge_tmp_db")
     merge_parser.add_argument("--config_file", action="store", dest="config_file")
+
+def print_config(options):
+    pass
 
 def print_task(options):
     config_file = options.config_file
