@@ -13,7 +13,9 @@ class FeatureGenerator(object):
                 'Cfsim': ("get_cfsim", 'cfsim'), \
                 'Core': ("get_core", 'core'), \
                 'ContextArg': ("get_contextArg", 'cArg'), \
-                'ContextCase': ("get_contextCase", 'cCase')
+                'ContextCase': ("get_contextCase", 'cCase'), \
+                'EmbedSim': ("get_embedSim", 'emb'), \
+                'EmbedSmall': ("get_embedSmall", 'embs')
                 }
 
     def __init__(self, config):
@@ -159,6 +161,26 @@ class FeatureGenerator(object):
             cCaseFeats.append("%s_%s:%.3f" % (a, postfix, score))
 
         return " ".join(cCaseFeats)
+
+    def get_embedSim(self, align, cf_pair, postfix, feat_dict):
+        embedFeats = []
+
+        embedDict = feat_dict['general']['embed']
+        for a in set(align) & set(embedDict.keys()):
+            score = embedDict[a]
+            embedFeats.append("%s_%s:%.3f" % (a, postfix, score))
+
+        return " ".join(embedFeats)
+
+    def get_embedSmall(self, align, cf_pair, postfix, feat_dict):
+        embedFeats = []
+
+        embedDict = feat_dict['general']['embed_s']
+        for a in set(align) & set(embedDict.keys()):
+            score = embedDict[a]
+            embedFeats.append("%s_%s:%.3f" % (a, postfix, score))
+
+        return " ".join(embedFeats)
 
     ### cf-related features.
     def get_cfsim(self, align, cf_pair, postfix, feat_dict):

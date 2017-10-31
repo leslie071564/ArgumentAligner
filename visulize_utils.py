@@ -9,10 +9,10 @@ def getColoredAlign(aligns_dict, highlight_color='red'):
     aligns_dict['+'] = map(lambda x: x.replace("'", "’"), aligns_dict['+'])
     colored_align = []
     colored_align += aligns_dict['+']
-    colored_align += ["<font color=\"%s\">\"%s\"</font>" % (highlight_color, x) for x in aligns_dict['-']]
+    colored_align += ["<font color=\"%s\">%s</font>" % (highlight_color, x) for x in aligns_dict['-']]
     if '*' in aligns_dict.keys():
         aligns_dict['*'] = map(lambda x: x.replace("'", "’"), aligns_dict['*'])
-        colored_align += ["<font color=\"gray\">\"%s\"</font>" % (x) for x in aligns_dict['*']]
+        colored_align += ["<font color=\"gray\">%s</font>" % (x) for x in aligns_dict['*']]
 
     colored_align = " ".join(colored_align)
     return colored_align
@@ -49,7 +49,7 @@ class SQLtable(object):
         self.c.execute("INSERT INTO %s VALUES (\'%s\')" % (self.table_name, "\',\'".join(row_data)))
 
 class EventPairTable(SQLtable):
-    cols = ["charStr", "gold", "pred1", "pred2", "cfs1", "cfs2", "cf_urls1", "cf_urls2"]
+    cols = ["charStr", "gold", "pred1", "pred2", "cfs1", "cfs2", "cf_urls1", "cf_urls2", 'rnnsp_tops_1', 'rnnsp_tops_2']
     table_name = "eventpair"
     def __init__(self, c, config):
         SQLtable.__init__(self, c, EventPairTable.cols, EventPairTable.table_name)
@@ -63,18 +63,26 @@ class EventPairTable(SQLtable):
 
         charStr = " -> ".join([ev['eventRep'] for ev in evp['events']])
         gold = " ".join(feats['goldRaw']) if feats['goldRaw'] != None else ""
+        gold = gold.replace("'", "’")
         cfs_data = [ ["[%s] %s(%.3f)" % (cf.cf_id, cf.cf_str, cf.rel_score) for cf in ev['cfs']] for ev in evp['events'] ]
         cf_urls = [ [ get_url(cf.cf_id) for cf in ev['cfs'] for cf in ev['cfs']] for ev in evp['events'] ]
 
         row_data += [ID, charStr, gold]
         row_data += [ utils.removeHira(ev['predRep']) for ev in evp['events'] ]
         row_data += [ encode_list(x) for x in cfs_data ]
-        row_data += [ encode_list(x) for c in cf_urls ]
+        row_data += [ encode_list(x) for x in cf_urls ]
+
+        for ev in evp['events']:
+            if 'rnnsp_tops' not in ev.keys():
+                row_data.append('')
+                continue
+            tops_list = ["[X %s %s]: %s" % (utils.ENG_HIRA[case], ev['eventRep'], ' | '.join(t_list)) for case, t_list in ev['rnnsp_tops'].iteritems()]
+            row_data.append(encode_list(tops_list))
 
         self.c.execute("INSERT INTO %s VALUES (\'%s\')" % (self.table_name, "\',\'".join(row_data)))
 
 class GeneralFeatureTable(SQLtable):
-    cols = ["conflict", "contextArg", "contextCase", "contextArgText", "contextCaseText"]
+    cols = ["conflict", "contextArg", "contextCase", "embed", "embed_s", "contextArgText", "contextCaseText"]
     table_name = "general_feature"
     def __init__(self, c, config):
         SQLtable.__init__(self, c, GeneralFeatureTable.cols, GeneralFeatureTable.table_name)
@@ -91,6 +99,12 @@ class GeneralFeatureTable(SQLtable):
         row_data.append(encode_dict(feats['conflict']))
         row_data.append(encode_dict(feats['cArg']))
         row_data.append(encode_dict(feats['cCase']))
+
+        if "embed" in feats.keys() and "embed_s" in feats.keys():
+            row_data.append(encode_dict(feats['embed']))
+            row_data.append(encode_dict(feats['embed_s']))
+        else:
+            row_data += ["", ""]
 
         row_data.append(encode_dict(contributors['cArg']))
         row_data.append(encode_dict(contributors['cCase']))
