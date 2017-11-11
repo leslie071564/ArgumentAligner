@@ -6,14 +6,23 @@ import shelve
 import argparse
 import sqlite3
 import utils
-from visulize_utils import getColoredAlign, SQLtable, EventPairTable, GeneralFeatureTable, cfFeatureTable
+from visulize_utils import OverviewTable, EventPairTable, GeneralFeatureTable, cfFeatureTable
+from collections import namedtuple
+import xlwt
+
+evalConfig = namedtuple('evalConfig', 'ev_db, feat_db')
+
+def setEvalConfig(config_fn):
+    config = yaml.load(open(config_fn, 'r'))
+    eval_config = evalConfig(config['output']['ev_db'], config['output']['feat_db'])
+
+    return eval_config
 
 class alignResultProcessor(object):
-    dataFormat = ["charStr", "cf_num1", "cf_num2", "goldResult", "outputResult"]
+    dataFormat = ["cf_num1", "cf_num2", "goldResult", "outputResult"]
     def __init__(self, config, result_file_prefix):
         self.config = config
-        self.ev_db = shelve.open(config['DB']['EVENT_PAIR'], flag='r')
-        self.feat_db = shelve.open(config['DB']['FEAT'], flag='r')
+        self.feat_db = shelve.open(config.feat_db, flag='r')
         self.resultFiles = utils.search_file_with_prefix(result_file_prefix)
 
         self._setResultData()
@@ -31,10 +40,7 @@ class alignResultProcessor(object):
                 exp_result = self._getResult(ID, output)
                 goldResult, outputResult = exp_result['gold'], exp_result['output']
 
-                evp = self.ev_db[ID]
-                charStr = " -> ".join([ev['eventRep'] for ev in evp['events']])
-
-                self.resultData[ID] = dict(zip(self.dataFormat, [charStr, cf1, cf2, goldResult, outputResult])) 
+                self.resultData[ID] = dict(zip(self.dataFormat, [cf1, cf2, goldResult, outputResult])) 
 
     def _getResult(self, ID, output):
         if output == ['null']:
@@ -94,24 +100,25 @@ class alignResultProcessor(object):
         output_counts = {'+': output_pos, '-': output_neg}
         return output_counts
 
-    def printOverviewTable(self, db_loc):
+    def printOverviewTable(self, db_loc, exp_name=None):
+        if os.path.exists(db_loc) and os.stat(db_loc).st_size != 0:
+            sys.stderr.write("not new file, skip initialization.\n")
+            existed = True
+        else:
+            existed = False
         conn = sqlite3.connect(db_loc)
         c = conn.cursor()
-        cols = ["charStr", "goldResult", "outputResult", "cf_num1", "cf_num2"]
-        table_name = "overview"
-        resultDB = SQLtable(c, cols, table_name)
 
-        for ID, data_dict in self.resultData.iteritems():
-            data = [] 
-            data.append(data_dict['charStr'])
-            data.append(getColoredAlign(data_dict['goldResult'], highlight_color='green'))
-            data.append(getColoredAlign(data_dict['outputResult'], highlight_color='red'))
-            data += [data_dict['cf_num1'], data_dict['cf_num2']]
-
-            resultDB.set_row([str(ID)] + data)
+        self._printOverviewTable(c, exp_name, existed)
 
         conn.commit()
         conn.close()
+
+    def _printOverviewTable(self, cursor, exp_name, existed):
+        sys.stderr.write("loading overview table...\n")
+        overviewTable = OverviewTable(cursor, self.config, exp_name, existed)
+        for ID, data_dict in self.resultData.iteritems():
+            overviewTable.set_row(ID, data_dict)
 
     def printDetailTables(self, db_loc):
         conn = sqlite3.connect(db_loc)
@@ -152,7 +159,7 @@ if __name__ == "__main__":
     parser.add_argument('--build_detail_db', action="store", dest="build_detail_db")
     options = parser.parse_args() 
 
-    config = yaml.load(open(options.config_file, 'r'))
+    config = setEvalConfig(options.config_file)
     evl = alignResultProcessor(config, options.result_dir)
 
     if options.print_scores:
