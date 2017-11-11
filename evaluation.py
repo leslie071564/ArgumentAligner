@@ -100,6 +100,42 @@ class alignResultProcessor(object):
         output_counts = {'+': output_pos, '-': output_neg}
         return output_counts
 
+    def write_excel(self, xlsx_file, exp_name, minors_only=False):
+        book = xlwt.Workbook(encoding="utf-8")
+        error_sheet = book.add_sheet("error")
+        corret_sheet = book.add_sheet("correct")
+
+        # set header line and column width.
+        for ws in [error_sheet, corret_sheet]:
+            self.write_excel_row(ws, 0, ['ID', 'Event Pair', 'output', 'gold', 'detail', 'judge'])
+            evp_col, output_col = ws.col(1), ws.col(2)
+            evp_col.width, output_col.width = 70 * 256, 10 * 256
+
+        error_num, correct_num = 1, 1
+        for ID, data in self.resultData.iteritems():
+            goldResult = " ".join(data['goldResult'].items())
+            outputResult = " ".join(data['outputResult'].items())
+            if minors_only and outputResult in ['g-g', '']:
+                continue
+
+            ids_page = "http://lotus.kuee.kyoto-u.ac.jp/~huang/argAligner/ids.php?id=%s&exp=%s" % (ID, exp_name)
+            hyperlink = 'HYPERLINK("%s", "link")' % (ids_page)
+
+            row_data = [ID, data["charStr"], outputResult, goldResult, xlwt.Formula(hyperlink), '']
+
+            if data['outputResult']['-'] == [] and data['goldResult']['-'] == []:
+                self.write_excel_row(corret_sheet, correct_num, row_data)
+                correct_num += 1
+            else:
+                self.write_excel_row(error_sheet, error_num, row_data)
+                error_num += 1
+
+        book.save(xlsx_file)
+
+    def write_excel_row(self, ws, row_num, row):
+        for col_num, element in enumerate(row):
+            ws.write(row_num, col_num, element)
+
     def printOverviewTable(self, db_loc, exp_name=None):
         if os.path.exists(db_loc) and os.stat(db_loc).st_size != 0:
             sys.stderr.write("not new file, skip initialization.\n")
@@ -153,10 +189,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', "--result_dir", action="store", dest="result_dir")
     parser.add_argument('--config_file', action="store", default="./config.yaml", dest="config_file")
+    parser.add_argument('--exp_name', action="store", dest="exp_name")
+    parser.add_argument('--minors_only', action="store_true", dest="minors_only")
 
     parser.add_argument('--print_scores', action="store_true", dest="print_scores")
     parser.add_argument('--build_overview_db', action="store", dest="build_overview_db")
     parser.add_argument('--build_detail_db', action="store", dest="build_detail_db")
+    parser.add_argument('--print_excel', action="store", dest="print_excel")
     options = parser.parse_args() 
 
     config = setEvalConfig(options.config_file)
@@ -170,4 +209,10 @@ if __name__ == "__main__":
 
     if options.build_detail_db:
         evl.printDetailTables(options.build_detail_db)
+
+    if options.print_excel:
+        if options.exp_name == None:
+            sys.stderr.write('please specify exp_name')
+            sys.exit()
+            evl.write_excel(options.print_excel, options.exp_name, minors_only=options.minors_only)
 
