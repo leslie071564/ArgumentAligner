@@ -108,8 +108,8 @@ def merge_tmp_db(config_file):
     ids_file = open(config['ids'], 'wb')
 
     doc_freq = defaultdict(int)
-    for f in utils.search_file_with_prefix(config['tmp_db_dir']):
-        ID = f.split('_')[-1]
+    for f in utils.search_file_with_prefix(config['tmp_db_dir'] + '/'):
+        ID = f.split('/')[-1].split('.')[0]
         tmp_db = shelve.open(f, flag='r')
         
         ev_db[ID] = tmp_db['ev']
