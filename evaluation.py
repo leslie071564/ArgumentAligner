@@ -14,7 +14,7 @@ evalConfig = namedtuple('evalConfig', 'ev_db, feat_db')
 
 def setEvalConfig(config_fn):
     config = yaml.load(open(config_fn, 'r'))
-    eval_config = evalConfig(config['output']['ev_db'], config['output']['feat_db'])
+    eval_config = evalConfig(config['db']['ev_db'], config['db']['feat_db'])
 
     return eval_config
 
@@ -23,6 +23,7 @@ class alignResultProcessor(object):
     def __init__(self, config, result_file_prefix):
         self.config = config
         self.feat_db = shelve.open(config.feat_db, flag='r')
+        self.ev_db = shelve.open(config.ev_db, flag='r')
         self.resultFiles = utils.search_file_with_prefix(result_file_prefix)
 
         self._setResultData()
@@ -113,15 +114,18 @@ class alignResultProcessor(object):
 
         error_num, correct_num = 1, 1
         for ID, data in self.resultData.iteritems():
-            goldResult = " ".join(data['goldResult'].items())
-            outputResult = " ".join(data['outputResult'].items())
+            goldResult = " ".join( sum(data['goldResult'].values(), []) )
+            outputResult = " ".join( sum(data['outputResult'].values(), []) )
             if minors_only and outputResult in ['g-g', '']:
                 continue
 
             ids_page = "http://lotus.kuee.kyoto-u.ac.jp/~huang/argAligner/ids.php?id=%s&exp=%s" % (ID, exp_name)
             hyperlink = 'HYPERLINK("%s", "link")' % (ids_page)
 
-            row_data = [ID, data["charStr"], outputResult, goldResult, xlwt.Formula(hyperlink), '']
+            evp = self.ev_db[ID]
+            charStr = " -> ".join([ev['eventRep'] for ev in evp['events']])
+
+            row_data = [ID, charStr, outputResult, goldResult, xlwt.Formula(hyperlink), '']
 
             if data['outputResult']['-'] == [] and data['goldResult']['-'] == []:
                 self.write_excel_row(corret_sheet, correct_num, row_data)
@@ -214,5 +218,5 @@ if __name__ == "__main__":
         if options.exp_name == None:
             sys.stderr.write('please specify exp_name')
             sys.exit()
-            evl.write_excel(options.print_excel, options.exp_name, minors_only=options.minors_only)
+        evl.write_excel(options.print_excel, options.exp_name, minors_only=options.minors_only)
 
