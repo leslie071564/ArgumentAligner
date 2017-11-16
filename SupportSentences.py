@@ -121,10 +121,14 @@ class SupportSentences(object):
             sid = sent_tuple.sid.split('%')[0]
             sup_knp = knp_extractor.get_knp(sid)
             if not sup_knp:
+                sys.stderr.write("fail to convert knp of %s.\n" % sid)
                 continue
 
-            result = knp.result(sup_knp.decode('utf-8'))
-            context_words.update(self._get_sentence_args(result))
+            try:
+                result = knp.result(sup_knp.decode('utf-8'))
+                context_words.update(self._get_sentence_args(result))
+            except:
+                sys.stderr.write("fail to convert knp of %s.\n" % sid)
         
         context_words = dict(context_words)
         return context_words
