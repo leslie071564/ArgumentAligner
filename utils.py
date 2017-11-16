@@ -98,7 +98,7 @@ def search_cdbs(cdbs, key, save_null=False):
             hits.append(this_hits)
     return hits
 ### Features. 
-def cosineSimilarity(v1, v2, strip=False, skip_set = [u"<主体準>"], restrict_set=[], get_contributors=False):
+def cosineSimilarity(v1, v2, strip=False, skip_set = [u"<主体準>"], restrict_set=[], get_contributors=False, threshold=0):
     """
     calculate cosine similarity of two dictionary-vector.
     """
@@ -110,6 +110,11 @@ def cosineSimilarity(v1, v2, strip=False, skip_set = [u"<主体準>"], restrict_
     if strip:
         v1 = {"+".join(map(lambda x: x.split('/')[0], arg.split('+'))) : count for arg, count in v1.iteritems()}
         v2 = {"+".join(map(lambda x: x.split('/')[0], arg.split('+'))) : count for arg, count in v2.iteritems()}
+
+    if threshold != 0:
+        restrict_set1 = [arg for arg, count in v1.iteritems() if count > threshold]
+        restrict_set2 = [arg for arg, count in v2.iteritems() if count > threshold]
+        restrict_set = set(restrict_set1) & set(restrict_set2)
 
     # calculate inner product
     inner, contribute_list = 0, []

@@ -192,14 +192,14 @@ class EventChain(object):
 
         return cf_dict, cf_contributors
 
-    def getCfsimFeats(self, cf1, cf2, get_contributors=False):
+    def getCfsimFeats(self, cf1, cf2, get_contributors=False, cf_threshold=0):
         cfsim_feature_dict, cfsim_contributors = defaultdict(float), {}
         for c1, c2 in itertools.product(cf1.args.keys(), cf2.args.keys()):
             align = "%s-%s" % (c1, c2)
             if get_contributors:
-                align_sim, contributors = utils.cosineSimilarity(cf1.args[c1], cf2.args[c2], get_contributors=True)
+                align_sim, contributors = utils.cosineSimilarity(cf1.args[c1], cf2.args[c2], get_contributors=True, threshold=cf_threshold)
             else:
-                align_sim = utils.cosineSimilarity(cf1.args[c1], cf2.args[c2])
+                align_sim = utils.cosineSimilarity(cf1.args[c1], cf2.args[c2], threshold=cf_threshold)
 
             align_sim = round(align_sim, 3)
             if align_sim:
