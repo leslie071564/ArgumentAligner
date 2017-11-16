@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-EXTRACT_DBS = {'CF_CDB': '/windroot/huang/cf_cdbs/20170502/new_cdb/new_cf.cdb.keymap',\
+EXTRACT_DBS = {'CF_CDB': '/windroot/huang/cf_cdbs/20170502_good/new_cdb/new_cf.cdb.keymap',\
                'COUNT_DB': '/windroot/huang/EventCounts/EventCounts_customized/all_count.cdb.keymap',\
                'KNP_INDEX_DB': '/pear/huang/knp_index_dbs/knp_index_$input_ver/knp_index.cdb.keymap',\
                'KNP_PARENT_DIR': '/pear/huang/knp_index_dbs/knp_index_$input_ver/knp_parent_dir',\
