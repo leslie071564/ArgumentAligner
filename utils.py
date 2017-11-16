@@ -7,6 +7,7 @@ import cdb
 import itertools
 from math import sqrt
 from pyknp import Juman
+from itertools import permutations
 juman = Juman(command="/home/huang/usr/bin/juman", rcfile="/home/huang/usr/etc/jumanrc")
 
 CASE_ENG = ['g', 'w', 'n', 'd']
@@ -57,6 +58,22 @@ def getAmbiguousPredicate(predRep):
     ambPred = "%s+%s" % (ambPred, postfix) if postfix else ambPred
 
     return ambPred if ambPred != predRep else None
+
+def getAmbiguousPredicates(predRep):
+    ambPreds = []
+    for pred in predRep.split('?'):
+        postfix = '+'.join(pred.split('+')[1:]) if '+' in pred else ""
+
+        result = juman.analysis(pred.split('/')[0].decode('utf-8'))
+        amb = result.mrph_list()[0].repnames()
+        ambs = ["?".join(x) for x in permutations(amb.split('?'))]
+
+        if postfix != "":
+            ambPreds = ["%s+%s" % (amb, postfix) for amb in ambs]
+        else:
+            ambPreds += ambs
+    return ambPreds
+
 
 ### file operation
 def search_file_with_prefix(prefix, extension=None):
@@ -207,10 +224,12 @@ def replace_by_category(mrph):
         return "[%s]" % mrph.bunrui
     return mrph.repname
 
-def removeHira(verboseStr, splitChar=['+']):
+def removeHira(verboseStr, splitChar=['+'], concatenate=False):
     verboseStrs = re.split(r'[%s]+' % ("".join(splitChar)), verboseStr)
     shortStrs = map(lambda x: x.split('/')[0], verboseStrs)
 
+    if concatenate:
+        return "".join(shortStrs)
     return "+".join(shortStrs)
 
 def get_sentence_by_sid(sid, sid2sent_dir):

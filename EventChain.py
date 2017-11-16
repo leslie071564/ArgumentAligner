@@ -4,7 +4,7 @@ import sys
 import shelve
 import itertools
 from subprocess import check_output
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 import utils
 from Event import Event
@@ -42,8 +42,14 @@ class EventChain(object):
             ev = Event(raw_pred, raw_arg, pred_key, self.config, self.debug)
             self.events.append(ev)
 
+        self.impossibleAlign = []
+        for case1, args1 in self.events[0].givenArgs.iteritems():
+            for case2, args2 in self.events[1].givenArgs.iteritems():
+                if not set.intersection(set(args1), set(args2)):
+                    self.impossibleAlign.append("%s-%s" % (case1, case2))
+
     def _init_gold(self):
-        if self.config.gold_file == 'None':
+        if not self.config.gold_file:
             self.goldRaw, self.goldExpansion, self.goldSets = None, None, []
             return
 
@@ -102,8 +108,7 @@ class EventChain(object):
             for j in xrange( min(max_cf_num, len(cfs2)) ):
                 cf_nums = "%s_%s" % (i, j)
 
-                cf1 = CaseFrame(self.config, cf_id=cfs1[i].cf_id)
-                cf2 = CaseFrame(self.config, cf_id=cfs2[j].cf_id)
+                cf1, cf2 = cfs1[i], cfs2[j]
                 all_features_dict[cf_nums], feature_contributors[cf_nums] = self.getCfFeats(cf1, cf2, get_contributors=get_contributors)
 
         # combined cf:
@@ -131,9 +136,12 @@ class EventChain(object):
                 sup_feature_dict[align] = sim
         return sup_feature_dict
 
-    def getContextArgScores(self, threshold=0):
+    def getContextArgScores(self, threshold=0, context_words=None):
+        if context_words == None:
+            context_words=self.context_words
+
         contextArgScores = {}
-        for context_word, count in self.context_words.iteritems():
+        for context_word, count in context_words.iteritems():
             if count <= threshold:
                 continue
 
@@ -149,9 +157,12 @@ class EventChain(object):
 
         return contextArgScores
 
-    def getContextCaseScores(self, threshold=0):
+    def getContextCaseScores(self, threshold=0, context_words=None):
+        if context_words == None:
+            context_words=self.context_words
+
         contextCaseScores = {}
-        for context_word, count in self.context_words.iteritems():
+        for context_word, count in context_words.iteritems():
             if count <= threshold:
                 continue
 
@@ -167,11 +178,15 @@ class EventChain(object):
 
         return contextCaseScores
             
-    def getCfFeats(self, cf1, cf2, get_contributors=False):
+    def getCfFeats(self, CF1, CF2, get_contributors=False):
+        cf1 = CaseFrame(self.config, cf_id=CF1.cf_id)
+        cf2 = CaseFrame(self.config, cf_id=CF2.cf_id)
+
         cf_dict, cf_contributors = {}, {}
 
         cf_dict['cfsim'], cf_contributors['cfsim'] = self.getCfsimFeats(cf1, cf2, get_contributors=get_contributors)
         cf_dict['core'] = self.getCoreFeats(cf1, cf2)
+        cf_dict['penalty'] = [CF1.wo_penalty, CF2.wo_penalty]
         ### cfArg
         ### cfCase
 
@@ -216,21 +231,28 @@ class EventChain(object):
 
         feat_dict['goldRaw'] = self.goldRaw
         feat_dict['goldSets'] = self.goldSets
+        feat_dict['impossibleAlign'] = self.impossibleAlign
 
-        ev_dict['context_words'] = self.context_words
         ev_dict['cArgScores'] = self.getContextArgScores()
         ev_dict['cCaseScores'] = self.getContextCaseScores()
+
+        supArgCounts = sum( (ev.supArgCounts for ev in self.events), Counter())
+        ev_dict['sArgScores'] = self.getContextArgScores(context_words=supArgCounts)
+        ev_dict['sCaseScores'] = self.getContextCaseScores(context_words=supArgCounts)
+
+        for ev in self.events:
+            for arg_dict in ev.supArgs.values():
+                self.context_words.update(arg_dict)
+        ev_dict['context_words'] = self.context_words
+
 
         feat_dict['features'], ev_dict['feature_contributors'] = self.getAllFeats(get_contributors=True)
 
         if self.debug:
-            print ev_dict.keys()
-            print feat_dict.keys()
-            print ev_dict['feature_contributors']
             return
 
         # write to tmp-db
-        export_db = "%s_%s" % (self.config.output_db, self.id)
+        export_db = "%s/%s.db" % (self.config.output_db, self.id)
         export_db = shelve.open(export_db)
         export_db['ev'] = ev_dict
         export_db['feat'] = feat_dict

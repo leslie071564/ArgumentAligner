@@ -4,7 +4,7 @@ import re
 import operator
 import itertools
 import xml.etree.ElementTree as ET
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, Counter
 
 sys.path.insert(1, "/home/huang/work/CDB_handler")
 from CDB_Reader import CDB_Reader
@@ -13,7 +13,7 @@ from utils import CASE_ENG, ENG_HIRA, ENG_KATA
 from CaseFrame import CaseFrame
 from event_to_counts import event_to_count
 ### where?
-CF = namedtuple('CF', ['cf_id', 'cf_str', 'rel_score'])
+CF = namedtuple('CF', ['cf_id', 'cf_str', 'rel_score', 'wo_penalty'])
 
 class Event(object):
     pred_pattern = r"[12]([vjn])([APCKML])(.+)$"
@@ -51,9 +51,7 @@ class Event(object):
     def _set_predAmb(self):
         self.predAmb = []
 
-        predAmb = utils.getAmbiguousPredicate(self.predRep)
-        if predAmb:
-            self.predAmb.append(predAmb)
+        self.predAmb += utils.getAmbiguousPredicates(self.predRep)
 
         ### MODIFY
         if self.predVoice == 'P':
@@ -117,6 +115,7 @@ class Event(object):
 
     def set_supArgs(self, supArgs):
         self.supArgs = supArgs
+        self.supArgCounts = sum( (Counter(case_dict) for case_dict in self.supArgs.values()), Counter())
 
     def set_cfs(self, max_cf_num=10, trim_threshold=0.1):
         candidate_cfs = self._get_all_cfs()
@@ -131,7 +130,7 @@ class Event(object):
 
         if self.debug:
             print "num of cf: %s" % len(self.cfs)
-            print "\n".join(["\t[%s]: %s (%.3f)" % (cf.cf_id, cf.cf_str, cf.rel_score) for cf in self.cfs])
+            print "\n".join(["\t[%s]: %s (%.3f) %s" % (cf.cf_id, cf.cf_str, cf.rel_score, cf.wo_penalty) for cf in self.cfs])
 
     def _get_all_cfs(self):
         cf_ids = self._get_cf_ids()
@@ -141,11 +140,19 @@ class Event(object):
             cf = CaseFrame(self.config, cf_id=cf_id)
             cf_rel = cf.getRelevanceScore(self.supArgs)
             cf_str = cf.get_cf_str()
+            wo_penalty = self._get_wo_penalty(cf)
 
-            cf_tuple = CF(cf_id, cf_str, cf_rel)
+            cf_tuple = CF(cf_id, cf_str, cf_rel, wo_penalty)
             candidate_cfs.append(cf_tuple)
 
         return candidate_cfs
+
+    def _get_wo_penalty(self, cf):
+        if 'w' in cf.args.keys():
+            return '00'
+
+        wo_penalty = "%s%s" % (int('w' in self.givenArgs.keys()), int('w' in self.supArgs.keys()))
+        return wo_penalty
 
     def _get_cf_ids(self):
         cf_cdb = CDB_Reader(self.config.cf_cdb)
@@ -167,6 +174,9 @@ class Event(object):
         return cf_ids
 
     def get_contextArgScore(self, context_word):
+        if context_word in self.supArgCounts.keys():
+            return self.get_supArgScore(context_word)
+
         if not hasattr(self, 'contextArgDenom'):
             self.get_contextArgDenom()
 
@@ -185,6 +195,31 @@ class Event(object):
                 if supScore != 0:
                     sup_dict[this_case] = max(sup_dict[this_case], supScore)
         return dict(sup_dict)
+
+    def get_supArgScore(self, sup_word):
+        sup_dict = {}
+        for case, case_dict in self.supArgs.iteritems():
+            if sup_word not in case_dict:
+                continue
+
+            supScore = round( float(case_dict[sup_word]) / sum(case_dict.values()), 3)
+            if supScore != 0:
+                sup_dict[case] = supScore
+
+        return sup_dict
+
+    def get_supCaseScore(self, sup_word):
+        sup_dict = {}
+        for case, case_dict in self.supArgs.iteritems():
+            if sup_word not in case_dict:
+                continue
+            sup_dict[case] = case_dict[sup_word]
+
+        if sup_dict != {}:
+            sup_sum = sum(sup_dict.values())
+            sup_dict = {case : round(float(score)/sup_sum, 3) for case, score in sup_dict.iteritems()}
+
+        return sup_dict
 
     def get_contextArgDenom(self):
         """
@@ -211,6 +246,9 @@ class Event(object):
         self.contextArgDenom = contextArgDenom
 
     def get_contextCaseScore(self, context_word):
+        if context_word in self.supArgCounts.keys():
+            return self.get_supCaseScore(context_word)
+
         predicates = [self.predRep]
         if self.predAmb:
             predicates += self.predAmb
