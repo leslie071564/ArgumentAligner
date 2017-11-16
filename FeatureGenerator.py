@@ -14,6 +14,8 @@ class FeatureGenerator(object):
                 'Core': ("get_core", 'core'), \
                 'ContextArg': ("get_contextArg", 'cArg'), \
                 'ContextCase': ("get_contextCase", 'cCase'), \
+                'SupportArg': ("get_supportArg", 'cArg'), \
+                'SupportCase': ("get_supportCase", 'cCase'), \
                 'EmbedSim': ("get_embedSim", 'emb'), \
                 'EmbedSmall': ("get_embedSmall", 'embs')
                 }
@@ -26,9 +28,10 @@ class FeatureGenerator(object):
         self.combFeats = config.combFeats
 
         self.neg_sample_size = config.neg_sample_size
+        self.without_impossible = config.without_impossible
     
     def get_test_features(self, ev_id, only_gold=False):
-        goldRaw, goldSets, feat_dict = self._get_eventchain_data(ev_id)
+        goldRaw, goldSets, feat_dict, impossible_aligns = self._get_eventchain_data(ev_id)
 
         # begin of file & comment line. 
         feature_strs = []
@@ -36,7 +39,13 @@ class FeatureGenerator(object):
         feature_strs.append("# %s %s" % (ev_id, goldRaw))
 
         #
-        allAlign = goldSets if only_gold else ALL_ALIGN
+        if only_gold:
+            allAlign = goldSets
+        elif self.without_impossible and impossible_aligns:
+            allAlign = [x for x in ALL_ALIGN if not set.intersection(set(x), set(impossible_aligns))]
+        else:
+            allAlign = ALL_ALIGN
+
         for cf_pair in feat_dict.keys():
             if cf_pair == 'general':
                 continue
@@ -57,7 +66,7 @@ class FeatureGenerator(object):
     def get_train_features(self, key):
         ev_id, cf1, cf2, gold_num = key.split('_')
         cf_pair = "%s_%s" % (cf1, cf2)
-        goldRaw, goldSets, feat_dict = self._get_eventchain_data(ev_id)
+        goldRaw, goldSets, feat_dict, impossible_aligns = self._get_eventchain_data(ev_id)
         goldAlign = goldSets[int(gold_num)]
 
         # begin of file & comment line. 
@@ -92,8 +101,9 @@ class FeatureGenerator(object):
             goldRaw = " ".join(data_dict['goldRaw'])
             goldSets = data_dict['goldSets']
         feat_dict = data_dict['features']
+        impossible_aligns = data_dict['impossibleAlign']
 
-        return goldRaw, goldSets, feat_dict
+        return goldRaw, goldSets, feat_dict, impossible_aligns
 
     def get_classStr(self, ev_id, cf_pair, alignment):
         alignStr = "null" if alignment == [] else "_".join(alignment)
@@ -162,6 +172,27 @@ class FeatureGenerator(object):
 
         return " ".join(cCaseFeats)
 
+    def get_supportArg(self, align, cf_pair, postfix, feat_dict):
+        sArgFeats = []
+
+        sArgDict = feat_dict['general']['sArg']
+        for a in set(align) & set(sArgDict.keys()):
+            score = sArgDict[a]
+            sArgFeats.append("%s_%s:%.3f" % (a, postfix, score))
+
+        return " ".join(sArgFeats)
+
+
+    def get_supportCase(self, align, cf_pair, postfix, feat_dict):
+        sCaseFeats = []
+
+        sCaseDict = feat_dict['general']['sCase']
+        for a in set(align) & set(sCaseDict.keys()):
+            score = sCaseDict[a]
+            sCaseFeats.append("%s_%s:%.3f" % (a, postfix, score))
+
+        return " ".join(sCaseFeats)
+
     def get_embedSim(self, align, cf_pair, postfix, feat_dict):
         embedFeats = []
 
@@ -188,8 +219,9 @@ class FeatureGenerator(object):
         
         cfsimScores = feat_dict[cf_pair]['cfsim']
         for a, cfsim in cfsimScores.iteritems():
-            if '_' in a:    # items used for normalization.
+            if '_' in a or '-' not in a:    # items used for normalization.
                 continue
+
             cfsim = cfsim if a in align else (-1) * cfsim
             cfsimFeats.append("%s_%s:%.3f" % (a, postfix, cfsim))
 

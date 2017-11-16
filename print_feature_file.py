@@ -27,7 +27,7 @@ def setPrintFeatureConfig(config_file):
     config = yaml.load(open(config_file, 'r'))
     feature_config = Namespace()
 
-    feature_config.feat_db = config['DB']['FEAT']
+    feature_config.feat_db = config['db']['feat_db']
 
     feature_config.normalFeats, feature_config.rivalFeats, feature_config.combFeats = [], [], []
     for feat in config['Feature extraction']['Load']:
@@ -39,6 +39,7 @@ def setPrintFeatureConfig(config_file):
             feature_config.normalFeats.append(feat)
 
     feature_config.neg_sample_size = config['Training']['NegSample']
+    feature_config.without_impossible = config['Test']['WithoutImpossible']
     return feature_config
 
 def print_train_feature_file(options):
