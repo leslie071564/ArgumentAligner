@@ -23,7 +23,7 @@ rm -f $choose_task_file
 
 # initilize
 # to be modified
-python $train_script initialize --ids_file $ids --key_file $key_file
+python $train_script initialize --ids_file $ids --key_file $key_file --config_file $config_file
 
 # train recursively.
 iter_max=$(( `cat $config_file | shyaml get-value Training.IterMax` ))
