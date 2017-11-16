@@ -4,14 +4,13 @@ exp_dir="$1"
 config_file="$2"
 
 # mkdir.
-mkdir -p $exp_dir
 result_dir=$exp_dir/result
-mkdir -p $result_dir
+mkdir -p $exp_dir $result_dir
 
 exp_config=$exp_dir/exp_config.yaml
 cp $config_file $exp_config
 
-IDS_raw=`cat $config_file | shyaml get-value DB.IDS`
+IDS_raw=`cat $config_file | shyaml get-value db.ids`
 IDS=$exp_dir/ids.txt
 cp $IDS_raw $IDS
 
