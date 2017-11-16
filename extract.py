@@ -141,13 +141,19 @@ def set_tf_idf(ev_db, feat_db):
         ev_dict = ev_db[ID]
 
         tf_idf_dict = {}
-        for word in ev_dict['cArgScores'].keys():
+        for word in ev_dict['cArgScores'].keys() + ev_dict['sArgScores'].keys():
             tf_idf_dict[word] = ev_dict['context_words'][word] * log(float(N) / doc_freq[word])
 
+        general_feat_dict = feat_dict['features']['general']
+        general_contributor_dict = ev_dict['feature_contributors']['general']
+
+        general_feat_dict['cArg'], general_contributor_dict['cArg'] = _get_contextFeatDict(ev_dict['cArgScores'], tf_idf_dict)
+        general_feat_dict['cCase'], general_contributor_dict['cCase'] = _get_contextFeatDict(ev_dict['cCaseScores'], tf_idf_dict, normalize=True)
+
+        general_feat_dict['sArg'], general_contributor_dict['sArg'] = _get_contextFeatDict(ev_dict['sArgScores'], tf_idf_dict)
+        general_feat_dict['sCase'], general_contributor_dict['sCase'] = _get_contextFeatDict(ev_dict['sCaseScores'], tf_idf_dict, normalize=True)
+
         ev_dict['tf_idf'] = tf_idf_dict
-        
-        feat_dict['features']['general']['cArg'], ev_dict['feature_contributors']['general']['cArg'] = _get_contextFeatDict(ev_dict['cArgScores'], tf_idf_dict)
-        feat_dict['features']['general']['cCase'], ev_dict['feature_contributors']['general']['cCase'] = _get_contextFeatDict(ev_dict['cCaseScores'], tf_idf_dict, normalize=True)
 
         ev_db[ID] = ev_dict
         feat_db[ID] = feat_dict
@@ -160,6 +166,9 @@ def _get_contextFeatDict(contextDicts, weightDict, normalize=False):
     contributorDict = defaultdict(str)
 
     for context_word, weight in weightDict.iteritems():
+        if context_word not in contextDicts.keys():
+            continue
+
         s1, s2 = contextDicts[context_word]
         for c1, c2 in itertools.product(s1.keys(), s2.keys()):
             score = weight * s1[c1] * s2[c2]
