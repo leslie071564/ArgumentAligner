@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import sys
+import yaml
+import shelve
 import argparse
+import random
 
 def setArgs(parser):
     subparsers = parser.add_subparsers(dest="_subcommand")
@@ -21,6 +24,7 @@ def setArgs(parser):
     choose_parser.add_argument("--output_dir", action="store", dest="output_dir")
 
     init_parser = subparsers.add_parser("initialize")
+    init_parser.add_argument("--config_file", action="store", dest="config_file")
     init_parser.add_argument("--ids_file", action="store", dest="ids_file")
     init_parser.add_argument("--key_file", action="store", dest="key_file")
 
@@ -48,9 +52,14 @@ def print_choose_task(options):
 def initilize_model(options):
     ids = get_ids(options.ids_file)
     key_file = open(options.key_file, 'w')
+    
+    config = yaml.load(open(options.config_file, 'r'))
+    FEAT_DB = shelve.open(config['db']['feat_db'], flag='r')
 
     for ev_id in ids:
-        key = "%s_0_0_0" % ev_id
+        cf_pairs = [x for x in FEAT_DB[ev_id]['features'].keys() if x != 'general']
+        #key = "%s_0_0_0" % ev_id
+        key = "%s_%s_0" % (ev_id, random.choice(cf_pairs))
         key_file.write(key + '\n')
 
 def get_ids(ids_file):
