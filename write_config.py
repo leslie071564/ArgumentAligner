@@ -13,13 +13,13 @@ DB_DEFS = {'CF_DB': '/windroot/huang/cf_cdbs/20170502/new_cdb/new_cf.cdb.keymap'
           }
 
 GOLD_DEFS = {'arg_file': '$extract_dir/input_pas.txt',\
-                 'gold_file': '/windroot/huang/argumentAligner/goldExp/gold.txt',\
-                 'input_dir': '/zinnia/huang/EventKnowledge/data',\
-                 'word_replace': '$input_dir/word_replace_db/wordreplace.cdb',\
-                 'key2sid': '$input_dir/pa_pairs_relation_db/pa_pairs_relation.cdb.keymap',\
-                 'sid2pa': '$input_dir/sid2pa/sid2pa.cdb.keymap',\
-                 'sid2sent': '',\
-                }
+             'gold_file': '/windroot/huang/argumentAligner/goldExp/gold.txt',\
+             'input_dir': '/zinnia/huang/EventKnowledge/data',\
+             'word_replace': '$input_dir/word_replace_db/wordreplace.cdb',\
+             'key2sid': '$input_dir/pa_pairs_relation_db/pa_pairs_relation.cdb.keymap',\
+             'sid2pa': '$input_dir/sid2pa/sid2pa.cdb.keymap',\
+             'sid2sent': '',\
+            }
     
 
 if __name__ == "__main__":
