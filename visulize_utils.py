@@ -52,7 +52,7 @@ class SQLtable(object):
 
 class OverviewTable(SQLtable):
     cols = ["charStr", "goldResult", "outputResult", "cf_num1", "cf_num2", \
-            "g1", "w1", "n1", "d1", "g2", "w2", "n2", "d2"]
+            "g1", "w1", "n1", "d1", "pred1", "g2", "w2", "n2", "d2", "pred2"]
     table_name = "overview"
     def __init__(self, c, config, exp_name=None, existed=False):
         self.exp_name = exp_name
@@ -84,6 +84,10 @@ class OverviewTable(SQLtable):
                     args = [utils.removeHira(x, concatenate=True) for x in supArgs[case].keys()]
                     row_data.append(encode_list(args))
                     #print encode_list(args)
+
+            pred = [utils.removeHira(x) for x in ev['predRep'].split('?')]
+            row_data.append(encode_list(pred))
+
         if self.exp_name != None:
             row_data.append(self.exp_name)
             
@@ -143,11 +147,15 @@ class GeneralFeatureTable(SQLtable):
         row_data.append(encode_dict(feats['cArg']))
         row_data.append(encode_dict(feats['cCase']))
 
-        if "embed" in feats.keys() and "embed_s" in feats.keys():
+        if "embed" in feats.keys():
             row_data.append(encode_dict(feats['embed']))
+        else:
+            row_data.append("")
+
+        if "embed_s" in feats.keys():
             row_data.append(encode_dict(feats['embed_s']))
         else:
-            row_data += ["", ""]
+            row_data.append("")
 
         row_data.append(encode_dict(contributors['cArg']))
         row_data.append(encode_dict(contributors['cCase']))
