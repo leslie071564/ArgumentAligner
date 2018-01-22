@@ -262,3 +262,32 @@ def get_sentence_by_sid(sid, sid2sent_dir):
         sys.stderr.write("Cannot retrieve sentence of sid:%s.\n" % sid)
     return sent
 
+### evaluation related
+def getColoredAlign(aligns_dict, highlight_color='red'):
+    aligns_dict['-'] = map(lambda x: x.replace("'", "’"), aligns_dict['-'])
+    aligns_dict['+'] = map(lambda x: x.replace("'", "’"), aligns_dict['+'])
+    colored_align = []
+    colored_align += aligns_dict['+']
+    colored_align += ["<font color=\"%s\">%s</font>" % (highlight_color, x) for x in aligns_dict['-']]
+    if '*' in aligns_dict.keys():
+        aligns_dict['*'] = map(lambda x: x.replace("'", "’"), aligns_dict['*'])
+        colored_align += ["<font color=\"gray\">%s</font>" % (x) for x in aligns_dict['*']]
+
+    colored_align = " ".join(colored_align)
+    return colored_align
+
+def encode_list(L):
+    """
+    ex: ['a', 'b', 'c'] => "0=a&1=b&2=c"
+    """
+    return "&".join(["%s=%s" % (index, element) for index, element in enumerate(L)])
+
+def encode_dict(d):
+    """
+    ex: {'k1' : 'v1', 'k2' : 'v2'} => "k1=v1&k2=v2"
+    """
+    return "&".join(["%s=%s" % (align, score) for align, score in d.items() if '_' not in align])
+
+def get_url(id_str):
+    return urllib.quote_plus(id_str.encode('utf-8'))
+

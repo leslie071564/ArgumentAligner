@@ -4,11 +4,11 @@ import sys
 import yaml
 import shelve
 import argparse
-import sqlite3
-import utils
-from visulize_utils import OverviewTable, EventPairTable, GeneralFeatureTable, cfFeatureTable
-from collections import namedtuple
 import xlwt
+from sqlalchemy import *
+from collections import namedtuple
+import utils
+from ResultSQLTables import OverviewTable, EventPairTable, GeneralFeatureTable, cfFeatureTable
 
 evalConfig = namedtuple('evalConfig', 'ev_db, feat_db')
 
@@ -141,53 +141,29 @@ class alignResultProcessor(object):
             ws.write(row_num, col_num, element)
 
     def printOverviewTable(self, db_loc, exp_name=None):
-        if os.path.exists(db_loc) and os.stat(db_loc).st_size != 0:
-            sys.stderr.write("not new file, skip initialization.\n")
-            existed = True
-        else:
-            existed = False
-        conn = sqlite3.connect(db_loc)
-        c = conn.cursor()
+        engine = create_engine('sqlite:///%s' % db_loc, echo=False)
+        metadata = MetaData(engine)
 
-        self._printOverviewTable(c, exp_name, existed)
-
-        conn.commit()
-        conn.close()
-
-    def _printOverviewTable(self, cursor, exp_name, existed):
         sys.stderr.write("loading overview table...\n")
-        overviewTable = OverviewTable(cursor, self.config, exp_name, existed)
-        for ID, data_dict in self.resultData.iteritems():
-            overviewTable.set_row(ID, data_dict)
+        overviewTable = OverviewTable(metadata, self.config)
+        overviewTable.set_rows(self.resultData)
 
     def printDetailTables(self, db_loc):
-        conn = sqlite3.connect(db_loc)
-        c = conn.cursor()
+        engine = create_engine('sqlite:///%s' % db_loc, echo=False)
+        metadata = MetaData(engine)
 
-        self.printEventPairTable(c)
-        self.printGeneralFeatureTable(c)
-        self.printCfFeatureTable(c)
-
-        conn.commit()
-        conn.close()
-
-    def printEventPairTable(self, cursor):
         sys.stderr.write("loading eventpair table...\n")
-        evpTable = EventPairTable(cursor, self.config)
-        for ID in self.resultData.keys():
-            evpTable.set_row(ID)
+        evpTable = EventPairTable(metadata, self.config)
+        evpTable.set_rows(self.resultData)
 
-    def printGeneralFeatureTable(self, cursor):
         sys.stderr.write("loading general feature table...\n")
-        genTable = GeneralFeatureTable(cursor, self.config)
-        for ID in self.resultData.keys():
-            genTable.set_row(ID)
+        genTable = GeneralFeatureTable(metadata, self.config)
+        genTable.set_rows(self.resultData)
 
-    def printCfFeatureTable(self, cursor):
         sys.stderr.write("loading cf feature table...\n")
-        cfTable = cfFeatureTable(cursor, self.config)
-        for ID in self.resultData.keys():
-            cfTable.set_rows(ID)
+        cfTable = cfFeatureTable(metadata, self.config)
+        cfTable.set_rows(self.resultData)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
