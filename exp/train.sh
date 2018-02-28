@@ -13,7 +13,8 @@ choose_dir=$exp_dir/choose
 train_dir=$exp_dir/train
 mkdir -p $choose_dir $train_dir
 
-train_script=./train_utils.py
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+train_script=$SCRIPTPATH/train_utils.py
 
 # print choose files.
 choose_task_file=./choose.task

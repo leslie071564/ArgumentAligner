@@ -13,7 +13,8 @@ result_file=$exp_dir/result.txt
 test_dir=$exp_dir/test
 mkdir -p $test_dir
 
-train_script=./train_utils.py
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+train_script=$SCRIPTPATH/train_utils.py
 
 # create test files
 test_task_file=./test.task

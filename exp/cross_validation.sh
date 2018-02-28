@@ -3,6 +3,10 @@ NICE="nice -n 19"
 exp_dir="$1"
 config_file="$2"
 
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+train_script=$SCRIPTPATH/train.sh
+test_script=$SCRIPTPATH/test.sh
+
 # mkdir.
 result_dir=$exp_dir/result
 mkdir -p $exp_dir $result_dir
@@ -34,8 +38,8 @@ do
     rm -f $cv_dir/ids_*
 
     echo "##### in the $i-th fold #####"
-    ./train.sh $train_dir $exp_config
-    ./test.sh $test_dir $exp_config $train_dir/model
+    $train_script $train_dir $exp_config
+    $test_script $test_dir $exp_config $train_dir/model
 
     sed -i '/@[eb]oi/d;/Accuracy*/d' $test_dir/result.txt
     cp $test_dir/result.txt $result_dir/result_$i.txt
@@ -43,4 +47,5 @@ do
 done
 
 # evaluation
-python ./evaluation.py --result_dir $result_dir/result_ --config_file $exp_config --print_scores
+eval_dir=$SCRIPTPATH/../eval
+python $eval_dir/evaluation.py --result_dir $result_dir/result_ --config_file $exp_config --print_scores

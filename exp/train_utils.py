@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
+import os
 import sys
 import yaml
 import shelve
 import argparse
 import random
+exp_script_dir = os.path.dirname(os.path.realpath(__file__))
+print_feat_script="%s/print_feature_file.py" % exp_script_dir
 
 def setArgs(parser):
     subparsers = parser.add_subparsers(dest="_subcommand")
@@ -34,20 +37,20 @@ def print_train_task(options):
     for key in keys:
         ev_id = key.split('_')[0]
         output_file = "%s/%s.txt" % (options.output_dir, ev_id)
-        print "python ./print_feature_file.py print_train --config_file %s --key %s --output_file %s && echo %s done." % (options.config_file, key, output_file, ev_id) 
+        print "python %s print_train --config_file %s --key %s --output_file %s && echo %s done." % (print_feat_script, options.config_file, key, output_file, ev_id) 
 
 def print_test_task(options):
     ids = get_ids(options.ids_file)
     for ev_id in ids:
         output_file = "%s/%s.txt" % (options.output_dir, ev_id)
-        print "python ./print_feature_file.py print_test --config_file %s --id %s --output_file %s && echo %s done." % (options.config_file, ev_id, output_file, ev_id) 
+        print "python %s print_test --config_file %s --id %s --output_file %s && echo %s done." % (print_feat_script, options.config_file, ev_id, output_file, ev_id) 
 
 def print_choose_task(options):
     ids = get_ids(options.ids_file)
 
     for ev_id in ids:
         output_file = "%s/%s.txt" % (options.output_dir, ev_id)
-        print "python ./print_feature_file.py print_test --config_file %s --id %s --output_file %s --only_gold_align && echo %s done." % (options.config_file, ev_id, output_file, ev_id) 
+        print "python %s print_test --config_file %s --id %s --output_file %s --only_gold_align && echo %s done." % (print_feat_script, options.config_file, ev_id, output_file, ev_id) 
 
 def initilize_model(options):
     ids = get_ids(options.ids_file)
