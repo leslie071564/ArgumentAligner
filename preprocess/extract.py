@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import sys
 import yaml
 import argparse
@@ -64,10 +65,12 @@ def print_task(options):
     arg_file = options.arg_file
     task_file = open(options.task_file, 'w')
 
+    extract_script = os.path.abspath(__file__)
+
     count = 0
     for line in open(arg_file).readlines():
         input_str = line.rstrip()
-        task = 'nice -n 19 python extract.py init_event_chain \"%s\" --config_file %s && echo %s done.' % (input_str, config_file, count)
+        task = 'nice -n 19 python %s init_event_chain \"%s\" --config_file %s && echo %s done.' % (extract_script, input_str, config_file, count)
         task_file.write(task + '\n')
         count += 1
 

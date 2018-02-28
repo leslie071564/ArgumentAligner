@@ -2,12 +2,14 @@
 input_ver="$1"
 extract_dir="$2"
 
-extract_script=./extract.py
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+extract_script=$SCRIPTPATH/extract.py
 
 # write config file.
 mkdir -p $extract_dir
 config_file=$extract_dir/extract_config.yaml
 python $extract_script write_config "$@" --config_file $config_file
+echo $config_file
 
 # generate task file from input arg_file 
 arg_file=`cat $config_file | shyaml get-value input_pas.arg_file`
